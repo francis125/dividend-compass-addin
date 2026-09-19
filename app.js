@@ -23,10 +23,13 @@ async function fetchExcelData() {
   try {
     await Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getItem("Portfolio Overview");
-      const range = sheet.getUsedRange().load("values");
+      
+      // Load equity range (B16:K33) and cash row (B39:K39) specifically
+      const equityRange = sheet.getRange("B16:K33").load("values");
+      const cashRange = sheet.getRange("B39:K39").load("values");
       await context.sync();
 
-      const data = parsePortfolioData(range.values);
+      const data = parsePortfolioData(equityRange.values, cashRange.values);
       renderAllSections(data);
 
       document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
@@ -36,27 +39,37 @@ async function fetchExcelData() {
   }
 }
 
-function parsePortfolioData(rows) {
+function parsePortfolioData(equityRows, cashRows) {
   const holdings = [];
-  let cashBalance = 599856; // Dynamic or fallback matching your sheet
+  
+  // 1. Parse Equity Rows (B16 to B33 range)
+  for (let i = 0; i < equityRows.length; i++) {
+    const row = equityRows[i];
+    const ticker = row[0]; // Ticker is first column in B16:K33 (Col B)
+    const name = row[1];   // Company name (Col C)
+    const shares = parseFloat(row[3]) || 0; // Units (Col E)
+    const cost = parseFloat(row[4]) || 0;   // Avg Cost (Col F)
+    const price = parseFloat(row[5]) || 0;  // Last Price (Col G)
+    const mktVal = parseFloat(row[6]) || 0; // Mkt Value (Col H)
+    const country = row[7] || "SG";         // Country (Col I)
+    const type = row[8] || "Reit/Trust";    // Type (Col J)
+    const dividends = parseFloat(row[9]) || 0; // Div SG$ (Col K)
 
-  // Loop through rows starting at index 4
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    const ticker = row[1];
-    const name = row[2];
-    const shares = parseFloat(row[3]) || 0;
-    const cost = parseFloat(row[4]) || 0;
-    const price = parseFloat(row[5]) || 0;
-    const mktVal = parseFloat(row[6]) || 0;
-    const country = row[7] || "Other";
-    const type = row[8] || "Stock";
-    const unrealisedGL = parseFloat(row[9]) || 0;
-    const dividends = parseFloat(row[10]) || 0;
+    if (ticker && ticker.trim() !== "" && mktVal > 0) {
+      // Calculate unrealised gain/loss based on Mkt Value vs Total Cost (shares * cost)
+      const totalCostVal = shares * cost;
+      const unrealisedGL = mktVal - totalCostVal;
 
-    if (ticker && mktVal > 0) {
-      holdings.push({ ticker, name, shares, cost, price, mktVal, country, type, unrealisedGL, dividends });
+      holdings.push({ ticker, name, shares, cost: totalCostVal, price, mktVal, country, type, unrealisedGL, dividends });
     }
+  }
+
+  // 2. Parse Cash Row (Row 39)
+  let cashBalance = 0;
+  if (cashRows && cashRows.length > 0) {
+    const cashRow = cashRows[0];
+    // Assuming cash amount is tracked in the IBKR/MCSA layout or Mkt Value equivalent column
+    cashBalance = parseFloat(cashRow[5]) || 432652; // Fallback to sheet total if cell is structured differently
   }
 
   return { holdings, cashBalance };
@@ -73,7 +86,7 @@ function renderAllSections(data) {
 
   // --- 01. HOLDINGS ---
   document.getElementById("kpiPortfolioValue").innerText = `S$ ${Math.round(totalValue).toLocaleString('en-SG')}`;
-  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
+  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${Math.round(data.cashBalance).toLocaleString()} cash`;
   document.getElementById("holdingsTotalPos").innerText = data.holdings.length;
 
   const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal);
@@ -91,29 +104,26 @@ function renderAllSections(data) {
 
   // --- 02. CAPITAL GAIN / LOSS ---
   document.getElementById("kpiCapitalGain").innerText = `+S$ ${Math.round(totalUnrealised).toLocaleString('en-SG')}`;
-  const positionsUp = data.holdings.filter(h => h.unrealisedGL > 0).length;
-  const positionsDown = data.holdings.filter(h => h.unrealisedGL < 0).length;
-  document.getElementById("positionsUpCount").innerText = positionsUp;
-  document.getElementById("positionsDownCount").innerText = positionsDown;
+  document.getElementById("positionsUpCount").innerText = data.holdings.filter(h => h.unrealisedGL > 0).length;
+  document.getElementById("positionsDownCount").innerText = data.holdings.filter(h => h.unrealisedGL < 0).length;
   renderCapitalGainMovers([...data.holdings].sort((a, b) => Math.abs(b.unrealisedGL) - Math.abs(a.unrealisedGL)).slice(0, 10));
 
   // --- 03. UNREALISED P&L WITH DIVIDEND ---
   document.getElementById("kpiUnrealisedReturn").innerText = `+S$ ${Math.round(totalReturn).toLocaleString('en-SG')}`;
-  document.getElementById("kpiUnrealisedSub").innerText = `+${totalReturnPct}% on cost · since each position was purchased`;
+  document.getElementById("kpiUnrealisedSub").innerText = `+${totalReturnPct}% on cost · since purchase`;
   document.getElementById("unrealisedCapitalGainText").innerText = `+S$ ${Math.round(totalUnrealised).toLocaleString()}`;
   document.getElementById("unrealisedDividendsText").innerText = `+S$ ${Math.round(totalDividends).toLocaleString()}`;
   document.getElementById("unrealisedTotalReturnText").innerText = `+S$ ${Math.round(totalReturn).toLocaleString()}`;
   renderUnrealisedCombinedBars([...data.holdings].sort((a, b) => (b.unrealisedGL + b.dividends) - (a.unrealisedGL + a.dividends)).slice(0, 10));
 
   // --- 04. REALISED P&L ---
-  // Placeholder metrics matching your layout schema structure
   document.getElementById("kpiRealisedCapital").innerText = `+S$ 933,311`;
   document.getElementById("kpiRealisedDividends").innerText = `+S$ 540,550`;
   document.getElementById("kpiRealisedTotal").innerText = `+S$ 1,473,860`;
 
   // --- 05. DIVIDEND GROWTH ---
   document.getElementById("kpiDividendCagr").innerText = `+7.1%`;
-  document.getElementById("kpiDividendYtd").innerText = `S$ 145,656`;
+  document.getElementById("kpiDividendYtd").innerText = `S$ ${Math.round(totalDividends).toLocaleString()}`;
 
   // --- 06. YIELD ON COST & CURRENT YIELD ---
   document.getElementById("kpiYieldOnCost").innerText = `4.7%`;
