@@ -20,35 +20,38 @@ function initTabs() {
 }
 
 async function fetchExcelData() {
-  await Excel.run(async (context) => {
-    const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
-    const poRange = poSheet.getUsedRange().load("values");
-    await context.sync();
+  try {
+    await Excel.run(async (context) => {
+      // Using your actual active sheet name visible in the workbook
+      const sheet = context.workbook.worksheets.getItem("Main Dashboard");
+      const range = sheet.getUsedRange().load("values");
+      await context.sync();
 
-    const poData = parsePortfolioOverview(poRange.values);
-    renderKPIs(poData);
-    renderHoldingsCharts(poData);
+      const data = parseMainDashboard(range.values);
+      renderKPIs(data);
+      renderHoldingsCharts(data);
 
-    document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-  }).catch((error) => {
+      document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    });
+  } catch (error) {
     console.error("Error reading workbook data:", error);
-  });
+    document.getElementById("kpiPortfolioValue").innerText = "Error loading";
+  }
 }
 
-function parsePortfolioOverview(rows) {
+function parseMainDashboard(rows) {
   const holdings = [];
   let cashBalance = 0;
   
-  for (let i = 4; i < rows.length; i++) {
+  // Scans the rows for your portfolio values
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const ticker = row[1];
-    const name = row[2];
-    const mktVal = parseFloat(row[6]) || 0;
-    const country = row[7];
-    const type = row[8];
+    // This safely reads your rows where data is structured
+    const ticker = row[1] || row[2];
+    const mktVal = parseFloat(row[6]) || parseFloat(row[7]) || 0;
 
-    if (ticker && mktVal > 0) {
-      holdings.push({ ticker, name, mktVal, country, type });
+    if (mktVal > 0) {
+      holdings.push({ ticker: ticker || "Asset", name: ticker || "Holding", mktVal });
     }
   }
   return { holdings, cashBalance };
@@ -56,8 +59,8 @@ function parsePortfolioOverview(rows) {
 
 function renderKPIs(data) {
   const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
-  document.getElementById("kpiPortfolioValue").innerText = `S$ ${totalValue.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
-  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
+  document.getElementById("kpiPortfolioValue").innerText = `S$ ${Math.round(totalValue).toLocaleString('en-SG')}`;
+  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} items loaded`;
 }
 
 function renderHoldingsCharts(data) {
@@ -74,7 +77,6 @@ function renderHoldingsCharts(data) {
     row.innerHTML = `
       <div class="bar-label">
         <div class="holding-name">${item.name}</div>
-        <div class="holding-ticker">${item.ticker}</div>
       </div>
       <div class="bar-track">
         <div class="bar-fill" style="width: ${pct}%"></div>
