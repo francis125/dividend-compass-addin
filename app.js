@@ -63,6 +63,7 @@ function renderKPIs(data) {
 function renderHoldingsCharts(data) {
   const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
   const container = document.getElementById("top10HoldingsBars");
+  if (!container) return;
   container.innerHTML = "";
   const maxVal = top10[0]?.mktVal || 1;
 
