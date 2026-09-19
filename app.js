@@ -23,14 +23,28 @@ async function fetchExcelData() {
   try {
     await Excel.run(async (context) => {
       const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
-      // Grab a wide enough range to cover all tickers and values safely
-      const poRange = poSheet.getRange("A1:N35").load("values");
+      const poRange = poSheet.getRange("B5:G30").load("values"); // Directly target exact columns B through G for rows 5 to 30
       await context.sync();
 
-      const poData = parsePortfolioOverview(poRange.values);
-      renderKPIs(poData);
-      renderHoldingsCharts(poData);
-      
+      console.log("Raw Excel Data Retrieved:", poRange.values);
+      const holdings = [];
+
+      poRange.values.forEach((row, index) => {
+        const ticker = row[0] ? String(row[0]).trim() : ""; // Column B
+        const name = row[1] ? String(row[1]).trim() : "";   // Column C
+        const price = formalismNumber(row[2]);              // Column D
+        const shares = formalismNumber(row[3]);             // Column E
+        const cost = formalismNumber(row[4]);               // Column F
+        const mktVal = formalismNumber(row[5]);             // Column G
+
+        if (ticker && mktVal > 0) {
+          holdings.push({ ticker, name, mktVal });
+        }
+      });
+
+      console.log("Parsed Holdings Count:", holdings.length);
+      renderHoldingsCharts(holdings);
+
       const pulledElem = document.getElementById("lastPulled");
       if (pulledElem) {
         pulledElem.innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
@@ -41,83 +55,31 @@ async function fetchExcelData() {
   }
 }
 
-function parsePortfolioOverview(rows) {
-  const holdings = [];
-  let cashBalance = 599856; 
-
-  // Safely loop through rows 5 onwards (array index 4)
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row) continue;
-    
-    const ticker = row[1] ? String(row[1]).trim() : "";
-    const name = row[2] ? String(row[2]).trim() : "";
-    
-    // Skip empty rows or totals headers
-    if (!ticker || ticker === "Ticker" || ticker.toUpperCase().includes("SGD")) continue;
-
-    const price = formalismNumber(row[3]);      
-    const shares = formalismNumber(row[4]);     
-    const cost = formalismNumber(row[5]);       
-    const mktVal = formalismNumber(row[6]);     
-    const country = row[7] || "SG";             
-    const type = row[8] || "Stock";             
-    const dividends = formalismNumber(row[12]); 
-
-    // Accept any row that has a name and a market value greater than 0
-    if (name && mktVal > 0) {
-      const totalCostVal = shares * cost;
-      const unrealisedGL = mktVal - totalCostVal;
-      holdings.push({ 
-        ticker: ticker || "N/A", 
-        name, 
-        shares, 
-        cost: totalCostVal, 
-        price, 
-        mktVal, 
-        country, 
-        type, 
-        unrealisedGL, 
-        dividends 
-      });
-    }
-  }
-
-  return { holdings, cashBalance };
-}
-
 function formalismNumber(val) {
-  if (val === undefined || val === null) return 0;
   if (typeof val === 'number') return val;
-  const cleaned = String(val).replace(/[$SGD,\s]/g, '');
-  return parseFloat(cleaned) || 0;
+  if (!val) return 0;
+  return parseFloat(String(val).replace(/[$SGD,\s]/g, '')) || 0;
 }
 
-function renderKPIs(data) {
-  const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
-  const valElem = document.getElementById("kpiPortfolioValue");
-  const countElem = document.getElementById("kpiHoldingsCount");
-  if (valElem) valElem.innerText = `S$ ${Math.round(totalValue).toLocaleString('en-SG')}`;
-  if (countElem) countElem.innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
-}
-
-function renderHoldingsCharts(data) {
+function renderHoldingsCharts(holdings) {
   const container = document.getElementById("top10HoldingsBars");
-  if (!container) return;
-
-  container.innerHTML = ""; 
-
-  if (!data.holdings || data.holdings.length === 0) {
-    container.innerHTML = `<div style="color: #8b949e; font-size: 11px; padding: 8px;">No holdings found to display.</div>`;
+  if (!container) {
+    console.error("Error: #top10HoldingsBars container element not found in DOM!");
     return;
   }
 
-  // Sort descending by market value and take up to the top 10
-  const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
-  const maxVal = top10[0]?.mktVal || 1;
+  container.innerHTML = ""; 
+
+  if (holdings.length === 0) {
+    container.innerHTML = `<div style="color: #f85149; padding: 10px;">No holdings parsed! Check console logs.</div>`;
+    return;
+  }
+
+  const top10 = [...holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
+  const maxVal = top10[0].mktVal || 1;
 
   top10.forEach(item => {
-    const pct = Math.max((item.mktVal / maxVal) * 100, 4); // ensures small bars remain visible
+    const pct = Math.max((item.mktVal / maxVal) * 100, 5);
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
