@@ -23,6 +23,7 @@ async function fetchExcelData() {
   try {
     await Excel.run(async (context) => {
       const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
+      // Grab a wide enough range to cover all tickers and values safely
       const poRange = poSheet.getRange("A1:N35").load("values");
       await context.sync();
 
@@ -44,7 +45,7 @@ function parsePortfolioOverview(rows) {
   const holdings = [];
   let cashBalance = 599856; 
 
-  // Loop through rows 5 onwards (array index 4 is row 5)
+  // Safely loop through rows 5 onwards (array index 4)
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
@@ -52,8 +53,8 @@ function parsePortfolioOverview(rows) {
     const ticker = row[1] ? String(row[1]).trim() : "";
     const name = row[2] ? String(row[2]).trim() : "";
     
-    // Stop if we hit empty rows, headers, or totals
-    if (!ticker || ticker === "Ticker" || ticker.toUpperCase().startsWith("SGD")) break;
+    // Skip empty rows or totals headers
+    if (!ticker || ticker === "Ticker" || ticker.toUpperCase().includes("SGD")) continue;
 
     const price = formalismNumber(row[3]);      
     const shares = formalismNumber(row[4]);     
@@ -63,11 +64,12 @@ function parsePortfolioOverview(rows) {
     const type = row[8] || "Stock";             
     const dividends = formalismNumber(row[12]); 
 
-    if (mktVal > 0) {
+    // Accept any row that has a name and a market value greater than 0
+    if (name && mktVal > 0) {
       const totalCostVal = shares * cost;
       const unrealisedGL = mktVal - totalCostVal;
       holdings.push({ 
-        ticker, 
+        ticker: ticker || "N/A", 
         name, 
         shares, 
         cost: totalCostVal, 
@@ -86,7 +88,9 @@ function parsePortfolioOverview(rows) {
 
 function formalismNumber(val) {
   if (val === undefined || val === null) return 0;
-  return parseFloat(String(val).replace(/,/g, '')) || 0;
+  if (typeof val === 'number') return val;
+  const cleaned = String(val).replace(/[$SGD,\s]/g, '');
+  return parseFloat(cleaned) || 0;
 }
 
 function renderKPIs(data) {
@@ -103,14 +107,17 @@ function renderHoldingsCharts(data) {
 
   container.innerHTML = ""; 
 
-  // Sort descending by market value and take top 10
-  const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
-  if (top10.length === 0) return;
+  if (!data.holdings || data.holdings.length === 0) {
+    container.innerHTML = `<div style="color: #8b949e; font-size: 11px; padding: 8px;">No holdings found to display.</div>`;
+    return;
+  }
 
-  const maxVal = top10[0].mktVal || 1;
+  // Sort descending by market value and take up to the top 10
+  const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
+  const maxVal = top10[0]?.mktVal || 1;
 
   top10.forEach(item => {
-    const pct = Math.max((item.mktVal / maxVal) * 100, 2); // ensures tiny bars are still visible
+    const pct = Math.max((item.mktVal / maxVal) * 100, 4); // ensures small bars remain visible
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
