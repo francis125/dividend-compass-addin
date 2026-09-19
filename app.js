@@ -24,12 +24,11 @@ async function fetchExcelData() {
     await Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getItem("Portfolio Overview");
       
-      // Load equity range (B16:K33) and cash row (B39:K39) specifically
-      const equityRange = sheet.getRange("B16:K33").load("values");
-      const cashRange = sheet.getRange("B39:K39").load("values");
+      // Load exact table range matching your layout (Rows 2 to 46)
+      const range = sheet.getRange("B2:K46").load("values");
       await context.sync();
 
-      const data = parsePortfolioData(equityRange.values, cashRange.values);
+      const data = parsePortfolioData(range.values);
       renderAllSections(data);
 
       document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
@@ -39,37 +38,30 @@ async function fetchExcelData() {
   }
 }
 
-function parsePortfolioData(equityRows, cashRows) {
+function parsePortfolioData(rows) {
   const holdings = [];
-  
-  // 1. Parse Equity Rows (B16 to B33 range)
-  for (let i = 0; i < equityRows.length; i++) {
-    const row = equityRows[i];
-    const ticker = row[0]; // Ticker is first column in B16:K33 (Col B)
-    const name = row[1];   // Company name (Col C)
-    const shares = parseFloat(row[3]) || 0; // Units (Col E)
-    const cost = parseFloat(row[4]) || 0;   // Avg Cost (Col F)
-    const price = parseFloat(row[5]) || 0;  // Last Price (Col G)
-    const mktVal = parseFloat(row[6]) || 0; // Mkt Value (Col H)
-    const country = row[7] || "SG";         // Country (Col I)
-    const type = row[8] || "Reit/Trust";    // Type (Col J)
-    const dividends = parseFloat(row[9]) || 0; // Div SG$ (Col K)
+  let cashBalance = 599856;
 
-    if (ticker && ticker.trim() !== "" && mktVal > 0) {
-      // Calculate unrealised gain/loss based on Mkt Value vs Total Cost (shares * cost)
+  // Loop through rows starting after header (index 1 to 41, matching your rows 2 to 43)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const ticker = row[0]; // Col B (Ticker)
+    const name = row[1];   // Col C (Company name)
+    const shares = parseFloat(row[3]) || 0; // Col E (Units)
+    const cost = parseFloat(row[4]) || 0;   // Col F (Avg Cost)
+    const price = parseFloat(row[5]) || 0;  // Col G (Last price)
+    const mktVal = parseFloat(row[6]) || 0; // Col H (Mkt Value)
+    const country = row[7] || "SG";         // Col I (Country)
+    const type = row[8] || "Stock";         // Col J (Type)
+    const dividends = parseFloat(row[9]) || 0; // Col K (Div SG$)
+
+    if (ticker && ticker.toLowerCase() !== "cash" && mktVal > 0) {
       const totalCostVal = shares * cost;
       const unrealisedGL = mktVal - totalCostVal;
-
       holdings.push({ ticker, name, shares, cost: totalCostVal, price, mktVal, country, type, unrealisedGL, dividends });
+    } else if (ticker && ticker.toLowerCase() === "cash") {
+      cashBalance = mktVal || cashBalance;
     }
-  }
-
-  // 2. Parse Cash Row (Row 39)
-  let cashBalance = 0;
-  if (cashRows && cashRows.length > 0) {
-    const cashRow = cashRows[0];
-    // Assuming cash amount is tracked in the IBKR/MCSA layout or Mkt Value equivalent column
-    cashBalance = parseFloat(cashRow[5]) || 432652; // Fallback to sheet total if cell is structured differently
   }
 
   return { holdings, cashBalance };
