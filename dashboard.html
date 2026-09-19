@@ -1,512 +1,116 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dividend Compass</title>
-<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-<style>
-  :root {
-    color-scheme: light;
-    --surface: #fcfcfb;
-    --page: #f9f9f7;
-    --card: #ffffff;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted: #898781;
-    --hairline: #e1e0d9;
-    --border: rgba(11,11,11,0.10);
-    --blue: #2a78d6;
-    --blue-soft: #eaf2fc;
-    --green: #006300;
-    --green-soft: #e6f4e6;
-    --red: #c2352f;
-    --red-soft: #fbeceb;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface: #1a1a19;
-      --page: #0d0d0d;
-      --card: #232322;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted: #898781;
-      --hairline: #2c2c2a;
-      --border: rgba(255,255,255,0.10);
-      --blue: #3987e5;
-      --blue-soft: #16283c;
-      --green: #0ca30c;
-      --green-soft: #123018;
-      --red: #e66767;
-      --red-soft: #341616;
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--page);
-    color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-size: 13px;
-  }
-  body { padding: 14px; padding-bottom: 28px; }
-
-  .header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 2px;
-  }
-  h1 {
-    font-size: 17px;
-    margin: 0;
-    letter-spacing: -0.01em;
-  }
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: 11.5px;
-    margin: 2px 0 10px 0;
-  }
-  .live-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-  .live-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    color: var(--green);
-    font-weight: 600;
-  }
-  .live-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 0 3px var(--green-soft);
-  }
-  .refresh-btn {
-    font-size: 11px;
-    color: var(--blue);
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 9px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .refresh-btn:hover { background: var(--blue-soft); }
-  .refresh-btn:disabled { opacity: 0.5; cursor: default; }
-  .updated {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    margin-bottom: 14px;
-  }
-
-  .hero {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-  }
-  .hero-label {
-    font-size: 10.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-  .hero-value {
-    font-size: 24px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-  }
-
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 18px;
-  }
-  .kpi-tile {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 9px 10px;
-  }
-  .kpi-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-muted);
-    margin-bottom: 3px;
-  }
-  .kpi-value {
-    font-size: 15px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-  .kpi-value.up { color: var(--green); }
-  .kpi-value.down { color: var(--red); }
-
-  .section-title {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    color: var(--text-secondary);
-    margin: 4px 0 10px 0;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--hairline);
-  }
-
-  .stat-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .stat-tile {
-    text-align: center;
-    padding: 8px 4px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-  }
-  .stat-value {
-    font-size: 14px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-  .stat-label {
-    font-size: 9.5px;
-    color: var(--text-muted);
-    margin-top: 2px;
-    line-height: 1.25;
-  }
-
-  .holding-row {
-    padding: 7px 0;
-    border-bottom: 1px solid var(--hairline);
-  }
-  .holding-row:last-child { border-bottom: none; }
-  .holding-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-  .holding-name {
-    font-size: 12px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 62%;
-  }
-  .holding-ticker {
-    font-size: 10px;
-    color: var(--text-muted);
-    font-weight: 400;
-    margin-left: 4px;
-  }
-  .holding-value {
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .holding-bar-track {
-    height: 5px;
-    background: var(--hairline);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 3px;
-  }
-  .holding-bar-fill {
-    height: 100%;
-    background: var(--blue);
-    border-radius: 3px;
-  }
-  .holding-bottom {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10.5px;
-    color: var(--text-muted);
-  }
-  .holding-pl.up { color: var(--green); }
-  .holding-pl.down { color: var(--red); }
-
-  .other-row {
-    padding-top: 8px;
-    font-size: 11px;
-    color: var(--text-muted);
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .footer-note {
-    margin-top: 16px;
-    padding-top: 10px;
-    border-top: 1px solid var(--hairline);
-    font-size: 10px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-
-  .status-banner {
-    font-size: 11.5px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-  }
-  .status-banner.error {
-    background: var(--red-soft);
-    color: var(--red);
-  }
-  .status-banner.loading {
-    background: var(--blue-soft);
-    color: var(--blue);
-  }
-  #app { display: none; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dividend Compass</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
 
-  <div class="header">
-    <h1>Dividend Compass</h1>
-  </div>
-  <div class="subtitle">Holdings snapshot &middot; live from your workbook</div>
-
-  <div class="live-row">
-    <span class="live-tag"><span class="live-dot"></span>Live</span>
-    <button class="refresh-btn" id="refreshBtn">Refresh now</button>
-  </div>
-  <div class="updated" id="updatedAt">Not yet loaded</div>
-
-  <div id="statusBanner"></div>
-
-  <div id="app">
-
-    <div class="hero">
-      <div class="hero-label">Portfolio Value</div>
-      <div class="hero-value" id="kpiPortfolioValue">&mdash;</div>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi-tile">
-        <div class="kpi-label">Unrealised Return</div>
-        <div class="kpi-value" id="kpiUnrealisedReturn">&mdash;</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-label">Dividend Income (Ann.)</div>
-        <div class="kpi-value" id="kpiDivIncome">&mdash;</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-label">Current Yield</div>
-        <div class="kpi-value" id="kpiCurrentYield">&mdash;</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-label">Yield on Cost</div>
-        <div class="kpi-value" id="kpiYieldOnCost">&mdash;</div>
+<body class="dark-theme">
+  <!-- Top Navigation & Header -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="badge-icon">DC</span>
+      <div>
+        <h1>Portfolio Dashboard</h1>
+        <p class="subtitle">Holdings · gains · dividends · yield, in one view</p>
       </div>
     </div>
-
-    <div class="section-title">01 &middot; Holdings</div>
-
-    <div class="stat-row">
-      <div class="stat-tile">
-        <div class="stat-value" id="statPositions">&mdash;</div>
-        <div class="stat-label">Total<br>Positions</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-value" id="statLargest">&mdash;</div>
-        <div class="stat-label">Largest<br>Holding</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-value" id="statTop5">&mdash;</div>
-        <div class="stat-label">Top 5<br>Concentration</div>
-      </div>
+    <div class="status-indicator">
+      <span class="dot live"></span>
+      <span>Live · from your workbook</span>
+      <span class="timestamp" id="lastPulled">Pulled --</span>
     </div>
+  </header>
 
-    <div id="holdingsList"></div>
-    <div class="other-row" id="otherRow"></div>
+  <!-- Navigation Tabs -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" data-tab="tab-holdings">01 Holdings</button>
+    <button class="tab-btn" data-tab="tab-capital">02 Capital gain/loss</button>
+    <button class="tab-btn" data-tab="tab-unrealised">03 Unrealised P&L</button>
+    <button class="tab-btn" data-tab="tab-realised">04 Realised P&L</button>
+    <button class="tab-btn" data-tab="tab-dividend">05 Dividend growth</button>
+  </nav>
 
-    <div class="footer-note">
-      Portfolio Value, Dividend Income and holdings pull from <strong>Portfolio Overview</strong>; Unrealised P/L pulls from <strong>Unrealized P&amp;L Dashboard</strong>. Data reflects the workbook at the time this panel last loaded &mdash; use Refresh to re-read it.
-    </div>
+  <main class="dashboard-container">
+    <!-- Top KPI Grid -->
+    <section class="kpi-grid">
+      <div class="card kpi-card">
+        <span class="kpi-title">PORTFOLIO VALUE</span>
+        <div class="kpi-value" id="kpiPortfolioValue">S$0</div>
+        <div class="kpi-sub" id="kpiHoldingsCount">0 holdings · S$0 cash on the side</div>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-title">UNREALISED RETURN</span>
+        <div class="kpi-value positive" id="kpiUnrealisedReturn">+S$0</div>
+        <div class="kpi-sub" id="kpiUnrealisedReturnSub">0.0% on cost · capital + dividends</div>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-title">DIVIDEND INCOME, ANNUALISED</span>
+        <div class="kpi-value" id="kpiAnnualisedDiv">S$0</div>
+        <div class="kpi-sub positive" id="kpiDivGrowthVsPrev">0.0% vs full-year 2025</div>
+      </div>
+      <div class="card kpi-card">
+        <span class="kpi-title">YIELD, CURRENT / ON COST</span>
+        <div class="kpi-value" id="kpiYieldPair">0.0% / 0.0%</div>
+        <div class="kpi-sub">trailing 12 months, on today's value / on what you paid</div>
+      </div>
+    </section>
 
-  </div>
+    <!-- 01 Holdings Tab Content -->
+    <section id="tab-holdings" class="tab-content active">
+      <div class="section-title">
+        <span class="section-num">01</span>
+        <div>
+          <h2>My Holdings</h2>
+          <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
+        </div>
+      </div>
 
-<script>
-  const fmtSGD = (n) => "S$" + Math.round(n).toLocaleString("en-US");
-  const fmtPct = (n, d = 2) => (n * 100).toFixed(d) + "%";
-  const fmtSigned = (n) => (n >= 0 ? "+" : "") + fmtSGD(n);
+      <div class="summary-cards">
+        <div class="card small-card">
+          <span class="kpi-title">TOTAL POSITIONS</span>
+          <div class="kpi-value-sm" id="holdingsTotalPos">0</div>
+        </div>
+        <div class="card small-card">
+          <span class="kpi-title">LARGEST HOLDING</span>
+          <div class="kpi-value-sm" id="holdingsLargestPct">0.0%</div>
+          <div class="kpi-sub" id="holdingsLargestName">--</div>
+        </div>
+        <div class="card small-card">
+          <span class="kpi-title">TOP 5 CONCENTRATION</span>
+          <div class="kpi-value-sm" id="holdingsTop5Pct">0.0%</div>
+          <div class="kpi-sub">of portfolio value</div>
+        </div>
+      </div>
 
-  function setStatus(kind, message) {
-    const el = document.getElementById("statusBanner");
-    if (!message) { el.innerHTML = ""; return; }
-    el.innerHTML = '<div class="status-banner ' + kind + '">' + message + "</div>";
-  }
+      <div class="card chart-card">
+        <h3>Market value by holding — top 10</h3>
+        <p class="chart-subtitle">in home currency (SGD)</p>
+        <div id="top10HoldingsBars" class="bar-chart-container"></div>
+      </div>
 
-  function renderDashboard(data) {
-    document.getElementById("app").style.display = "block";
-    setStatus(null);
+      <div class="card">
+        <h3>Asset mix</h3>
+        <div id="assetMixBar" class="stacked-bar"></div>
+        <div id="assetMixLegend" class="legend-list"></div>
+      </div>
 
-    document.getElementById("kpiPortfolioValue").textContent = fmtSGD(data.portfolioValue);
+      <div class="card">
+        <h3>Geographic mix</h3>
+        <div id="geoMixBars" class="bar-chart-container"></div>
+      </div>
+    </section>
 
-    const urEl = document.getElementById("kpiUnrealisedReturn");
-    urEl.textContent = fmtSigned(data.unrealisedReturn);
-    urEl.className = "kpi-value " + (data.unrealisedReturn >= 0 ? "up" : "down");
+    <!-- Placeholders for remaining tabs -->
+    <section id="tab-capital" class="tab-content"></section>
+    <section id="tab-unrealised" class="tab-content"></section>
+    <section id="tab-realised" class="tab-content"></section>
+    <section id="tab-dividend" class="tab-content"></section>
+  </main>
 
-    document.getElementById("kpiDivIncome").textContent = fmtSGD(data.divIncome);
-    document.getElementById("kpiCurrentYield").textContent = fmtPct(data.currentYield);
-    document.getElementById("kpiYieldOnCost").textContent = fmtPct(data.yieldOnCost);
-
-    document.getElementById("statPositions").textContent = data.totalPositions;
-    document.getElementById("statLargest").textContent = fmtPct(data.largestHoldingPct, 1);
-    document.getElementById("statTop5").textContent = fmtPct(data.top5Concentration, 0);
-
-    const list = document.getElementById("holdingsList");
-    list.innerHTML = "";
-    const maxVal = data.holdings.length ? data.holdings[0].mktValue : 1;
-    data.holdings.forEach((h) => {
-      const pct = maxVal > 0 ? Math.max(2, (h.mktValue / maxVal) * 100) : 2;
-      const plClass = h.pl === "" ? "" : (h.pl >= 0 ? "up" : "down");
-      const plText = h.pl === "" ? "&ndash;" : fmtSigned(h.pl);
-      const row = document.createElement("div");
-      row.className = "holding-row";
-      row.innerHTML =
-        '<div class="holding-top">' +
-          '<span class="holding-name">' + h.company + '<span class="holding-ticker">' + h.ticker + '</span></span>' +
-          '<span class="holding-value">' + fmtSGD(h.mktValue) + '</span>' +
-        '</div>' +
-        '<div class="holding-bar-track"><div class="holding-bar-fill" style="width:' + pct.toFixed(1) + '%"></div></div>' +
-        '<div class="holding-bottom">' +
-          '<span>' + fmtPct(h.weight, 1) + ' of portfolio</span>' +
-          '<span class="holding-pl ' + plClass + '">' + plText + '</span>' +
-        '</div>';
-      list.appendChild(row);
-    });
-
-    const otherRow = document.getElementById("otherRow");
-    if (data.otherCount > 0) {
-      otherRow.innerHTML =
-        '<span>Other (' + data.otherCount + ' holdings)</span><span>' + fmtSGD(data.otherValue) + ' &middot; ' + fmtPct(data.otherValue / data.portfolioValue, 1) + '</span>';
-    } else {
-      otherRow.innerHTML = "";
-    }
-
-    document.getElementById("updatedAt").textContent =
-      "Pulled " + new Date().toLocaleString("en-SG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-
-  async function loadDashboard() {
-    const btn = document.getElementById("refreshBtn");
-    btn.disabled = true;
-    setStatus("loading", "Reading your workbook&hellip;");
-    try {
-      await Excel.run(async (context) => {
-        const po = context.workbook.worksheets.getItem("Portfolio Overview");
-        const upl = context.workbook.worksheets.getItem("Unrealized P&L Dashboard");
-
-        const poValue = po.getRange("F52");
-        const poDivIncome = po.getRange("I52");
-        const poTickers = po.getRange("B5:B30");
-        const poCompanies = po.getRange("C5:C30");
-        const poMktValues = po.getRange("G5:G30");
-        const poWeights = po.getRange("J5:J30");
-
-        const uplCompanies = upl.getRange("B7:B32");
-        const uplPL = upl.getRange("J7:J32");
-        const uplCost = upl.getRange("G7:G32");
-
-        [poValue, poDivIncome, poTickers, poCompanies, poMktValues, poWeights, uplCompanies, uplPL, uplCost]
-          .forEach((r) => r.load("values"));
-
-        await context.sync();
-
-        const portfolioValue = Number(poValue.values[0][0]) || 0;
-        const divIncome = Number(poDivIncome.values[0][0]) || 0;
-
-        const tickers = poTickers.values.map((r) => r[0]);
-        const companies = poCompanies.values.map((r) => r[0]);
-        const mktValues = poMktValues.values.map((r) => Number(r[0]) || 0);
-        const weights = poWeights.values.map((r) => Number(r[0]) || 0);
-
-        const uplNames = uplCompanies.values.map((r) => r[0]);
-        const uplPLVals = uplPL.values.map((r) => Number(r[0]) || 0);
-        const uplCostVals = uplCost.values.map((r) => Number(r[0]) || 0);
-
-        const totalPositions = tickers.filter((t) => t !== "" && t != null).length;
-        const validWeights = weights.filter((w) => Number.isFinite(w) && w > 0);
-        const largestHoldingPct = validWeights.length ? Math.max(...validWeights) : 0;
-        const top5Concentration = validWeights
-          .slice()
-          .sort((a, b) => b - a)
-          .slice(0, 5)
-          .reduce((a, b) => a + b, 0);
-
-        const unrealisedReturn = uplPLVals.reduce((a, b) => a + b, 0);
-        const totalCost = uplCostVals.reduce((a, b) => a + b, 0);
-        const currentYield = portfolioValue > 0 ? divIncome / portfolioValue : 0;
-        const yieldOnCost = totalCost > 0 ? divIncome / totalCost : 0;
-
-        const rows = [];
-        for (let i = 0; i < totalPositions; i++) {
-          if (!tickers[i]) continue;
-          const idx = uplNames.indexOf(companies[i]);
-          rows.push({
-            ticker: tickers[i],
-            company: companies[i],
-            mktValue: mktValues[i],
-            weight: weights[i],
-            pl: idx >= 0 ? uplPLVals[idx] : "",
-          });
-        }
-        rows.sort((a, b) => b.mktValue - a.mktValue);
-        const top10 = rows.slice(0, 10);
-        const rest = rows.slice(10);
-        const otherValue = rest.reduce((a, b) => a + b.mktValue, 0);
-
-        renderDashboard({
-          portfolioValue,
-          unrealisedReturn,
-          divIncome,
-          currentYield,
-          yieldOnCost,
-          totalPositions,
-          largestHoldingPct,
-          top5Concentration,
-          holdings: top10,
-          otherCount: rest.length,
-          otherValue,
-        });
-      });
-    } catch (err) {
-      setStatus("error", "Couldn't load data: " + (err && err.message ? err.message : err));
-      console.error(err);
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
-
-  if (typeof Office !== "undefined") {
-    Office.onReady(() => {
-      loadDashboard();
-      setInterval(loadDashboard, 60000);
-    });
-  } else {
-    setStatus("error", "This page is designed to run inside Excel as an add-in task pane.");
-  }
-</script>
+  <script src="app.js"></script>
 </body>
 </html>
