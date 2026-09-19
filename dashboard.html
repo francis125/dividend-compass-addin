@@ -7,7 +7,6 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body class="dark-theme">
   <!-- Top Navigation & Header -->
   <header class="app-header">
@@ -25,7 +24,7 @@
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
+  <!-- Section Tabs -->
   <nav class="nav-tabs">
     <button class="tab-btn active" data-tab="tab-holdings">01 Holdings</button>
     <button class="tab-btn" data-tab="tab-capital">02 Capital gain/loss</button>
@@ -59,7 +58,7 @@
       </div>
     </section>
 
-    <!-- 01 Holdings Tab Content -->
+    <!-- Content Sections -->
     <section id="tab-holdings" class="tab-content active">
       <div class="section-title">
         <span class="section-num">01</span>
@@ -68,7 +67,6 @@
           <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
         </div>
       </div>
-
       <div class="summary-cards">
         <div class="card small-card">
           <span class="kpi-title">TOTAL POSITIONS</span>
@@ -85,32 +83,13 @@
           <div class="kpi-sub">of portfolio value</div>
         </div>
       </div>
-
       <div class="card chart-card">
         <h3>Market value by holding — top 10</h3>
         <p class="chart-subtitle">in home currency (SGD)</p>
         <div id="top10HoldingsBars" class="bar-chart-container"></div>
       </div>
-
-      <div class="card">
-        <h3>Asset mix</h3>
-        <div id="assetMixBar" class="stacked-bar"></div>
-        <div id="assetMixLegend" class="legend-list"></div>
-      </div>
-
-      <div class="card">
-        <h3>Geographic mix</h3>
-        <div id="geoMixBars" class="bar-chart-container"></div>
-      </div>
     </section>
-
-    <!-- Placeholders for remaining tabs -->
-    <section id="tab-capital" class="tab-content"></section>
-    <section id="tab-unrealised" class="tab-content"></section>
-    <section id="tab-realised" class="tab-content"></section>
-    <section id="tab-dividend" class="tab-content"></section>
   </main>
-
   <script src="app.js"></script>
 </body>
 </html>
