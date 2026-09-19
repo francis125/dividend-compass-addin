@@ -37,22 +37,22 @@ async function fetchExcelData() {
 
 function parsePortfolioOverview(rows) {
   const holdings = [];
-  let cashBalance = 599856; // Adjust if pulled dynamically elsewhere
+  let cashBalance = 599856; 
 
   // Rows 5 to 30 correspond to array indices 4 through 29
   for (let i = 4; i <= 29; i++) {
     const row = rows[i];
     if (!row) continue;
     
-    const ticker = row[1]; // Column B (Ticker)
-    const name = row[2];   // Column C (Company name)
-    const shares = parseFloat(row[4]) || 0; // Column E (Units)
-    const cost = parseFloat(row[5]) || 0;   // Column F (Avg Cost)
-    const price = parseFloat(row[3]) || 0;  // Column D (Last Price)
-    const mktVal = parseFloat(row[6]) || 0; // Column G (Mkt Value SGD)
+    const ticker = row[1]; // Column B
+    const name = row[2];   // Column C
+    const price = formalismNumber(row[3]); // Column D
+    const shares = formalismNumber(row[4]); // Column E
+    const cost = formalismNumber(row[5]);   // Column F
+    const mktVal = formalismNumber(row[6]); // Column G (Mkt Value SGD)
     const country = row[7] || "SG";         // Column H
     const type = row[8] || "Stock";         // Column I
-    const dividends = parseFloat(row[10]) || 0; // Column K
+    const dividends = formalismNumber(row[10]); // Column K
 
     if (ticker && mktVal > 0) {
       const totalCostVal = shares * cost;
@@ -62,6 +62,10 @@ function parsePortfolioOverview(rows) {
   }
 
   return { holdings, cashBalance };
+}
+
+function formalismNumber(val) {
+  return parseFloat(String(val).replace(/,/g, '')) || 0;
 }
 
 function renderKPIs(data) {
