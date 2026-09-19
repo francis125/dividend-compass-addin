@@ -35,12 +35,12 @@ async function fetchExcelData() {
   });
 }
 
-function parsePortfolioOverview(rows) {
+function parsePortfolioOverview ( rows ) {
   const holdings = [];
-  let cashBalance = 599856; // Fallback / default cash component if needed
+  let cashBalance = 599856; 
 
   // Loop through your equity rows starting from index 3 (Row 5 onwards)
-  for (let i = 3; i < rows.length; i++) {
+  for ( let i = 3 ; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
     
