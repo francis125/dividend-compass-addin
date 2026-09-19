@@ -24,8 +24,8 @@ async function fetchExcelData() {
     await Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getItem("Portfolio Overview");
       
-      // Load exact table range matching your layout (Rows 2 to 46)
-      const range = sheet.getRange("B2:K46").load("values");
+      // Target your exact layout from row 2 to 45
+      const range = sheet.getRange("B2:K45").load("values");
       await context.sync();
 
       const data = parsePortfolioData(range.values);
@@ -42,20 +42,20 @@ function parsePortfolioData(rows) {
   const holdings = [];
   let cashBalance = 599856;
 
-  // Loop through rows starting after header (index 1 to 41, matching your rows 2 to 43)
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const ticker = row[0]; // Col B (Ticker)
-    const name = row[1];   // Col C (Company name)
+    const ticker = row[0]; // Col B
+    const name = row[1];   // Col C
     const shares = parseFloat(row[3]) || 0; // Col E (Units)
     const cost = parseFloat(row[4]) || 0;   // Col F (Avg Cost)
-    const price = parseFloat(row[5]) || 0;  // Col G (Last price)
+    const price = parseFloat(row[5]) || 0;  // Col G (Last Price)
     const mktVal = parseFloat(row[6]) || 0; // Col H (Mkt Value)
-    const country = row[7] || "SG";         // Col I (Country)
-    const type = row[8] || "Stock";         // Col J (Type)
+    const country = row[7] || "SG";         // Col I
+    const type = row[8] || "Stock";         // Col J
     const dividends = parseFloat(row[9]) || 0; // Col K (Div SG$)
 
-    if (ticker && ticker.toLowerCase() !== "cash" && mktVal > 0) {
+    // Filter true equities (ignore empty rows and cash lines)
+    if (ticker && ticker.toLowerCase() !== "cash" && mktVal > 0 && shares > 0) {
       const totalCostVal = shares * cost;
       const unrealisedGL = mktVal - totalCostVal;
       holdings.push({ ticker, name, shares, cost: totalCostVal, price, mktVal, country, type, unrealisedGL, dividends });
