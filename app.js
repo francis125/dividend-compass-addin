@@ -35,24 +35,24 @@ async function fetchExcelData() {
   });
 }
 
-function parsePortfolioOverview ( rows ) {
+function parsePortfolioOverview(rows) {
   const holdings = [];
-  let cashBalance = 599856; 
+  let cashBalance = 599856; // Adjust if pulled dynamically elsewhere
 
-  // Loop through your equity rows starting from index 3 (Row 5 onwards)
-  for ( let i = 3 ; i < rows.length; i++) {
+  // Rows 5 to 30 correspond to array indices 4 through 29
+  for (let i = 4; i <= 29; i++) {
     const row = rows[i];
     if (!row) continue;
     
-    const ticker = row[1]; // Col C
-    const name = row[2];   // Col D
-    const shares = parseFloat(row[4]) || 0; // Col F
-    const cost = parseFloat(row[5]) || 0;   // Col G
-    const price = parseFloat(row[6]) || 0;  // Col H
-    const mktVal = parseFloat(row[7]) || 0; // Col I
-    const country = row[8] || "SG";         // Col J
-    const type = row[9] || "Stock";         // Col K
-    const dividends = parseFloat(row[11]) || 0; // Col M
+    const ticker = row[1]; // Column B (Ticker)
+    const name = row[2];   // Column C (Company name)
+    const shares = parseFloat(row[4]) || 0; // Column E (Units)
+    const cost = parseFloat(row[5]) || 0;   // Column F (Avg Cost)
+    const price = parseFloat(row[3]) || 0;  // Column D (Last Price)
+    const mktVal = parseFloat(row[6]) || 0; // Column G (Mkt Value SGD)
+    const country = row[7] || "SG";         // Column H
+    const type = row[8] || "Stock";         // Column I
+    const dividends = parseFloat(row[10]) || 0; // Column K
 
     if (ticker && mktVal > 0) {
       const totalCostVal = shares * cost;
