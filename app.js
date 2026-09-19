@@ -22,11 +22,19 @@ function initTabs() {
 async function fetchExcelData() {
   await Excel.run(async (context) => {
     const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
+    const unrlSheet = context.workbook.worksheets.getItem("Unrealized P&L Dashboard");
+    const divSheet = context.workbook.worksheets.getItem("Dividend Dashboard");
+
     const poRange = poSheet.getUsedRange().load("values");
+    const unrlRange = unrlSheet.getUsedRange().load("values");
+    const divRange = divSheet.getUsedRange().load("values");
+    
     await context.sync();
 
     const poData = parsePortfolioOverview(poRange.values);
-    renderKPIs(poData);
+    const metrics = parseDashboardMetrics(unrlRange.values, divRange.values, poData);
+    
+    renderKPIs(poData, metrics);
     renderHoldingsCharts(poData);
 
     document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
@@ -54,12 +62,55 @@ function parsePortfolioOverview(rows) {
   return { holdings, cashBalance };
 }
 
-function renderKPIs(data) {
+function parseDashboardMetrics(unrlRows, divRows, poData) {
+  // Pull totals from your summary calculation cells (adjust row/col indices if your layout differs)
+  let unrealisedGain = 0;
+  let costBasis = 0;
+  let annualDiv = 0;
+
+  // Example parsing for summary rows (typically found near the top of the sheets)
+  try {
+    // Scans Unrealized P&L sheet for total gain/loss values
+    for (let r = 0; r < unrlRows.length; r++) {
+      for (let c = 0; c < unrlRows[r].length; c++) {
+        if (unrlRows[r][c] === "Total Unrealised P&L" || unrlRows[r][c] === "Total Gain / Loss") {
+          unrealisedGain = parseFloat(unrlRows[r][c + 2]) || 0;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not auto-parse unrealised summary:", e);
+  }
+
+  const totalValue = poData.holdings.reduce((sum, h) => sum + h.mktVal, 0) + poData.cashBalance;
+  const returnPct = costBasis > 0 ? (unrealisedGain / costBasis) * 100 : 0;
+  
+  return {
+    unrealisedGain,
+    returnPct,
+    annualDiv,
+    currentYield: totalValue > 0 ? (annualDiv / totalValue) * 100 : 0,
+    costYield: costBasis > 0 ? (annualDiv / costBasis) * 100 : 0
+  };
+}
+
+function renderKPIs(data, metrics) {
   const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
+  
+  // Portfolio Value
   document.getElementById("kpiPortfolioValue").innerText = `S$ ${totalValue.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
   document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
   
-  document.getElementById("holdingsTotalPos").innerText = data.holdings.length;
+  // Unrealised Return
+  const sign = metrics.unrealisedGain >= 0 ? "+" : "";
+  document.getElementById("kpiUnrealisedReturn").innerText = `${sign}S$ ${Math.round(metrics.unrealisedGain).toLocaleString()}`;
+  document.getElementById("kpiUnrealisedReturnSub").innerText = `${metrics.returnPct.toFixed(1)}% on cost · capital + dividends`;
+
+  // Dividend Income
+  document.getElementById("kpiAnnualisedDiv").innerText = `S$ ${Math.round(metrics.annualDiv).toLocaleString()}`;
+
+  // Yields
+  document.getElementById("kpiYieldPair").innerText = `${metrics.currentYield.toFixed(2)}% / ${metrics.costYield.toFixed(2)}%`;
 }
 
 function renderHoldingsCharts(data) {
@@ -74,8 +125,8 @@ function renderHoldingsCharts(data) {
     row.className = "bar-row";
     row.innerHTML = `
       <div class="bar-label">
-        <span class="holding-name">${item.name}</span>
-        <span class="holding-ticker">${item.ticker}</span>
+        <div class="holding-name">${item.name}</div>
+        <div class="holding-ticker">${item.ticker}</div>
       </div>
       <div class="bar-track">
         <div class="bar-fill" style="width: ${pct}%"></div>
@@ -84,17 +135,4 @@ function renderHoldingsCharts(data) {
     `;
     container.appendChild(row);
   });
-
-  if (top10.length > 0) {
-    const largest = top10[0];
-    const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
-    const largestPct = totalValue > 0 ? ((largest.mktVal / totalValue) * 100).toFixed(1) : 0;
-    
-    document.getElementById("holdingsLargestPct").innerText = `${largestPct}%`;
-    document.getElementById("holdingsLargestName").innerText = largest.name;
-
-    const top5Sum = top10.slice(0, 5).reduce((sum, h) => sum + h.mktVal, 0);
-    const top5Pct = totalValue > 0 ? ((top5Sum / totalValue) * 100).toFixed(1) : 0;
-    document.getElementById("holdingsTop5Pct").innerText = `${top5Pct}%`;
-  }
 }
