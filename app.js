@@ -1,69 +1,103 @@
+Office.onReady((info) => {
+  if (info.host === Office.HostType.Excel) {
+    document.addEventListener("DOMContentLoaded", () => {
+      initTabs();
+      fetchExcelData();
+    });
+  }
+});
+
+function initTabs() {
+  const tabs = document.querySelectorAll(".tab-btn");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById(tab.dataset.tab).classList.add("active");
+    });
+  });
+}
+
 async function fetchExcelData() {
   await Excel.run(async (context) => {
-    // 1. Target Main Dashboard sheet where your data resides
-    const mainSheet = context.workbook.worksheets.getItem("Main Dashboard");
-    
-    // Read the used range of Main Dashboard
-    const mainRange = mainSheet.getUsedRange().load("values");
+    // Target the correct worksheet
+    const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
+    const poRange = poSheet.getUsedRange().load("values");
     await context.sync();
 
-    // 2. Parse Main Dashboard Data (Matching your workbook layout)
-    const rows = mainRange.values;
-    const poData = parseMainDashboard(rows);
+    // Parse the portfolio data rows dynamically
+    const poData = parsePortfolioOverview(poRange.values);
 
-    // 3. Render Dashboard Components
+    // Render components
     renderKPIs(poData);
     renderHoldingsCharts(poData);
-    
-    document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric'})}`;
+
+    document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
   }).catch((error) => {
     console.error("Error reading workbook data:", error);
   });
 }
 
-function parseMainDashboard(rows) {
-  // Extract summary metrics from Main Dashboard top section
-  const portfolioValue = parseFloat(rows[4]?.[2]) || 0; // Row 5, Col C
-  const unrealisedReturn = parseFloat(rows[4]?.[5]) || 0; // Row 5, Col F
-  const annualisedDiv = parseFloat(rows[7]?.[2]) || 0; // Row 8, Col C
-  
-  const totalPositions = parseInt(rows[12]?.[2]) || 0; // Row 13, Col C
-  const largestHoldingPct = parseFloat(rows[12]?.[5]) || 0; // Row 13, Col F
-  const top5Concentration = parseFloat(rows[12]?.[8]) || 0; // Row 13, Col I
+function parsePortfolioOverview(rows) {
+  let holdings = [];
+  let cashBalance = 0;
+  let headerRowIndex = -1;
 
-  const holdings = [];
-  
-  // Parse holdings table starting around row 16 onwards
-  for (let i = 15; i < rows.length; i++) {
+  // Scan dynamically to find the header row containing 'ticker' or 'symbol'
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const name = row[2]; // Col C
-    const ticker = row[5]; // Col F
-    const mktVal = parseFloat(row[7]) || 0; // Col H
-    
-    if (ticker && mktVal > 0) {
-      holdings.push({ ticker, name, mktVal });
+    if (row.some(cell => typeof cell === 'string' && (cell.toLowerCase().includes('ticker') || cell.toLowerCase().includes('symbol')))) {
+      headerRowIndex = i;
+      break;
     }
   }
 
-  return {
-    portfolioValue,
-    unrealisedReturn,
-    annualisedDiv,
-    totalPositions,
-    largestHoldingPct,
-    top5Concentration,
-    holdings,
-    cashBalance: 0
-  };
+  if (headerRowIndex === -1) return { holdings, cashBalance };
+
+  // Parse data rows below the header
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+    const row = rows[i];
+    const ticker = row[1];
+    const name = row[2];
+    const mktVal = parseFloat(row[6]) || 0;
+    const country = row[7];
+    const type = row[8];
+
+    if (ticker && mktVal > 0) {
+      holdings.push({ ticker, name, mktVal, country, type });
+    }
+  }
+  return { holdings, cashBalance };
 }
 
 function renderKPIs(data) {
-  document.getElementById("kpiPortfolioValue").innerText = `S$ ${data.portfolioValue.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
-  document.getElementById("kpiHoldingsCount").innerText = `${data.totalPositions} holdings · S$0 cash on the side`;
-  document.getElementById("kpiUnrealisedReturn").innerText = `+S$ ${data.unrealisedReturn.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
-  document.getElementById("kpiAnnualisedDiv").innerText = `S$ ${data.annualisedDiv.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
-  
-  document.getElementById("holdingsTotalPos").innerText = data.totalPositions;
-  document.getElementById("holdingsLargestPct").innerText = `${(data.largestHoldingPct * 100).toFixed(1)}%`;
-  document.getElementById("holdingsTop5Pct").innerText = `${(data.top5Concentration * 100).toFixed(1)}%`;
+  const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
+  document.getElementById("kpiPortfolioValue").innerText = `S$ ${totalValue.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
+  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
+  document.getElementById("holdingsTotalPos").innerText = data.holdings.length;
+}
+
+function renderHoldingsCharts(data) {
+  const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
+  const container = document.getElementById("top10HoldingsBars");
+  container.innerHTML = "";
+  const maxVal = top10[0]?.mktVal || 1;
+
+  top10.forEach(item => {
+    const pct = (item.mktVal / maxVal) * 100;
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-label">
+        <div class="holding-name">${item.name}</div>
+        <div class="holding-ticker">${item.ticker}</div>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width: ${pct}%"></div>
+      </div>
+      <div class="bar-value">S$ ${Math.round(item.mktVal).toLocaleString()}</div>
+    `;
+    container.appendChild(row);
+  });
 }
