@@ -1,96 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dividend Compass</title>
+    <link rel="stylesheet" href="style.css">
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="dark-theme">
-    <!-- Top Navigation & Header -->
-    <header class="app-header">
-        <div class="brand">
-            <span class="badge-icon">DC</span>
-            <div>
-                <h1>Portfolio Dashboard</h1>
-                <p class="subtitle">Holdings · gains · dividends · yield, in one view</p>
+<body>
+    <div class="app-container">
+        <!-- Header Section -->
+        <div class="header-section">
+            <div class="header-top">
+                <div class="logo-title-group">
+                    <div class="dc-badge">DC</div>
+                    <div class="title-block">
+                        <h1>Portfolio Dashboard</h1>
+                        <p>Holdings · gains · dividends · yield, in one view</p>
+                    </div>
+                </div>
+                <div class="status-badge">
+                    <span class="status-dot"></span> Live · from your workbook
+                </div>
+            </div>
+            <div class="pulled-text">Pulled 18 Sept 2026</div>
+
+            <!-- Navigation Tabs -->
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="tab-holdings">01 Holdings</button>
+                <button class="tab-btn" data-tab="tab-capital">02 Capital gain/loss</button>
+                <button class="tab-btn" data-tab="tab-unrealised">03 Unrealised P&L</button>
+                <button class="tab-btn" data-tab="tab-realised">04 Realised P&L</button>
+                <button class="tab-btn" data-tab="tab-dividend">05 Dividend gr...</button>
             </div>
         </div>
-        <div class="status-indicator">
-            <span class="dot live"></span>
-            <span>Live · from your workbook</span>
-            <span class="timestamp" id="lastPulled">Pulled --</span>
+
+        <!-- Tab Content Area -->
+        <div id="tab-holdings" class="tab-content active">
+            <!-- Top Summary Cards Grid -->
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="card-label">PORTFOLIO VALUE</div>
+                    <div class="card-metric">S$5,271,425</div>
+                    <div class="card-sub">26 holdings · +S$599,856 cash on the side</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">UNREALISED RETURN</div>
+                    <div class="card-metric green">+S$1,215,647</div>
+                    <div class="card-sub">+24.8% on cost · capital + dividends since purchase</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">DIVIDEND INCOME, ANNUALISED</div>
+                    <div class="card-metric">S$248,661</div>
+                    <div class="card-sub">+17.8% vs full-year 2025</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">YIELD, CURRENT / ON COST</div>
+                    <div class="card-metric">4.4% <span class="sub-val">/ 4.7%</span></div>
+                    <div class="card-sub">trailing 12 months, on today's value / on what you paid</div>
+                </div>
+            </div>
+
+            <!-- Section 01: My Holdings -->
+            <div class="section-block">
+                <div class="section-header">
+                    <span class="section-num">01</span>
+                    <div>
+                        <h2>My Holdings</h2>
+                        <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
+                    </div>
+                </div>
+
+                <div class="grid-3col">
+                    <div class="card sub-card">
+                        <div class="card-label">TOTAL POSITIONS</div>
+                        <div class="card-metric-sm">26</div>
+                    </div>
+                    <div class="card sub-card">
+                        <div class="card-label">LARGEST HOLDING</div>
+                        <div class="card-metric-sm">18.3%</div>
+                        <div class="card-sub-name">Vanguard Australian Shares High Yield ETF</div>
+                    </div>
+                    <div class="card sub-card">
+                        <div class="card-label">TOP 5 CONCENTRATION</div>
+                        <div class="card-metric-sm">49.5%</div>
+                        <div class="card-sub">of portfolio value</div>
+                    </div>
+                </div>
+
+                <!-- Market Value Bars -->
+                <div class="card bar-card">
+                    <div class="bar-title">Market value by holding — top 10</div>
+                    <div class="bar-subtitle">in home currency (SGD)</div>
+                    
+                    <div id="top10HoldingsBars" class="bars-container">
+                        <!-- Dynamically populated rows -->
+                        <div class="bar-row">
+                            <div class="bar-label-group">
+                                <div class="holding-name">Vanguard Australian Sh...</div>
+                                <div class="holding-ticker">VHY.AX</div>
+                            </div>
+                            <div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div>
+                            <div class="bar-value">S$967,429</div>
+                        </div>
+                        <div class="bar-row">
+                            <div class="bar-label-group">
+                                <div class="holding-name">iShares UK Dividend U...</div>
+                                <div class="holding-ticker">IUKD.L</div>
+                            </div>
+                            <div class="bar-track"><div class="bar-fill" style="width: 77%;"></div></div>
+                            <div class="bar-value">S$749,809</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </header>
 
-    <!-- Section Tabs -->
-    <nav class="nav-tabs">
-        <button class="tab-btn active" data-tab="tab-holdings">01 Holdings</button>
-        <button class="tab-btn" data-tab="tab-capital">02 Capital gain/loss</button>
-        <button class="tab-btn" data-tab="tab-unrealised">03 Unrealised P&L</button>
-        <button class="tab-btn" data-tab="tab-realised">04 Realised P&L</button>
-        <button class="tab-btn" data-tab="tab-dividend">05 Dividend growth</button>
-    </nav>
-
-    <main class="dashboard-container">
-        <!-- Top KPI Grid -->
-        <section class="kpi-grid">
-            <div class="card kpi-card">
-                <span class="kpi-title">PORTFOLIO VALUE</span>
-                <div class="kpi-value" id="kpiPortfolioValue">S$0</div>
-                <div class="kpi-sub" id="kpiHoldingsCount">0 holdings · S$0 cash on the side</div>
-            </div>
-            <div class="card kpi-card">
-                <span class="kpi-title">UNREALISED RETURN</span>
-                <div class="kpi-value positive" id="kpiUnrealisedReturn">+S$0</div>
-                <div class="kpi-sub" id="kpiUnrealisedReturnSub">0.0% on cost · capital + dividends</div>
-            </div>
-            <div class="card kpi-card">
-                <span class="kpi-title">DIVIDEND INCOME, ANNUALISED</span>
-                <div class="kpi-value" id="kpiAnnualisedDiv">S$0</div>
-                <div class="kpi-sub positive" id="kpiDivGrowthVsPrev">0.0% vs full-year 2025</div>
-            </div>
-            <div class="card kpi-card">
-                <span class="kpi-title">YIELD, CURRENT / ON COST</span>
-                <div class="kpi-value" id="kpiYieldPair">0.0% / 0.0%</div>
-                <div class="kpi-sub">trailing 12 months, on today's value / on what you paid</div>
-            </div>
-        </section>
-
-        <!-- Content Sections -->
-        <section id="tab-holdings" class="tab-content active">
-            <div class="section-title">
-                <span class="section-num">01</span>
-                <div>
-                    <h2>My Holdings</h2>
-                    <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
-                </div>
-            </div>
-            <div class="summary-cards">
-                <div class="card small-card">
-                    <span class="kpi-title">TOTAL POSITIONS</span>
-                    <div class="kpi-value-sm" id="holdingsTotalPos">0</div>
-                </div>
-                <div class="card small-card">
-                    <span class="kpi-title">LARGEST HOLDING</span>
-                    <div class="kpi-value-sm" id="holdingsLargestPct">0.0%</div>
-                    <div class="kpi-sub" id="holdingsLargestName">--</div>
-                </div>
-                <div class="card small-card">
-                    <span class="kpi-title">TOP 5 CONCENTRATION</span>
-                    <div class="kpi-value-sm" id="holdingsTop5Pct">0.0%</div>
-                    <div class="kpi-sub">of portfolio value</div>
-                </div>
-            </div>
-            <div class="card chart-card">
-                <h3>Market value by holding — top 10</h3>
-                <p class="chart-subtitle">in home currency (SGD)</p>
-                <div id="top10HoldingsBars" class="bar-chart-container"></div>
-            </div>
-        </section>
-    </main>
-
+        <div id="tab-capital" class="tab-content">
+            <!-- 02 Content placeholder -->
+        </div>
+        <div id="tab-unrealised" class="tab-content"></div>
+        <div id="tab-realised" class="tab-content"></div>
+        <div id="tab-dividend" class="tab-content"></div>
+    </div>
     <script src="app.js"></script>
 </body>
 </html>
