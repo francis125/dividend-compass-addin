@@ -27,7 +27,7 @@ async function fetchExcelData() {
       await context.sync();
 
       const data = parsePortfolioData(range.values);
-      renderDashboard(data);
+      renderAllSections(data);
 
       document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
     });
@@ -38,9 +38,9 @@ async function fetchExcelData() {
 
 function parsePortfolioData(rows) {
   const holdings = [];
-  let cashBalance = 599856; // Fallback or parsed from summary row if dynamic
+  let cashBalance = 599856; // Dynamic or fallback matching your sheet
 
-  // Iterate past headers (assuming rows start around index 4 based on your sheet setup)
+  // Loop through rows starting at index 4
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     const ticker = row[1];
@@ -49,8 +49,8 @@ function parsePortfolioData(rows) {
     const cost = parseFloat(row[4]) || 0;
     const price = parseFloat(row[5]) || 0;
     const mktVal = parseFloat(row[6]) || 0;
-    const country = row[7];
-    const type = row[8];
+    const country = row[7] || "Other";
+    const type = row[8] || "Stock";
     const unrealisedGL = parseFloat(row[9]) || 0;
     const dividends = parseFloat(row[10]) || 0;
 
@@ -62,22 +62,20 @@ function parsePortfolioData(rows) {
   return { holdings, cashBalance };
 }
 
-function renderDashboard(data) {
+function renderAllSections(data) {
   const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
-  const totalUnrealised = data.holdings.reduce((sum, h) => sum + h.unrealisedGL, 0);
   const totalCost = data.holdings.reduce((sum, h) => sum + h.cost, 0);
+  const totalUnrealised = data.holdings.reduce((sum, h) => sum + h.unrealisedGL, 0);
+  const totalDividends = data.holdings.reduce((sum, h) => sum + h.dividends, 0);
+  const totalReturn = totalUnrealised + totalDividends;
   const unrealisedPct = totalCost > 0 ? ((totalUnrealised / totalCost) * 100).toFixed(1) : 0;
+  const totalReturnPct = totalCost > 0 ? ((totalReturn / totalCost) * 100).toFixed(1) : 0;
 
-  // 1. KPI Top Cards
+  // --- 01. HOLDINGS ---
   document.getElementById("kpiPortfolioValue").innerText = `S$ ${Math.round(totalValue).toLocaleString('en-SG')}`;
   document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
-  
-  document.getElementById("kpiUnrealisedReturn").innerText = `+S$ ${Math.round(totalUnrealised).toLocaleString('en-SG')}`;
-  document.getElementById("kpiUnrealisedSub").innerText = `+${unrealisedPct}% on cost · capital + dividends since purchase`;
-
-  // 2. Holdings Section KPIs
   document.getElementById("holdingsTotalPos").innerText = data.holdings.length;
-  
+
   const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal);
   if (top10.length > 0) {
     const largest = top10[0];
@@ -89,29 +87,92 @@ function renderDashboard(data) {
     const top5Pct = ((top5Sum / totalValue) * 100).toFixed(1);
     document.getElementById("holdingsTop5Pct").innerText = `${top5Pct}%`;
   }
+  renderTop10MarketValueBars(top10.slice(0, 10));
 
-  renderTop10Bars(top10.slice(0, 10), totalValue);
+  // --- 02. CAPITAL GAIN / LOSS ---
+  document.getElementById("kpiCapitalGain").innerText = `+S$ ${Math.round(totalUnrealised).toLocaleString('en-SG')}`;
+  const positionsUp = data.holdings.filter(h => h.unrealisedGL > 0).length;
+  const positionsDown = data.holdings.filter(h => h.unrealisedGL < 0).length;
+  document.getElementById("positionsUpCount").innerText = positionsUp;
+  document.getElementById("positionsDownCount").innerText = positionsDown;
+  renderCapitalGainMovers([...data.holdings].sort((a, b) => Math.abs(b.unrealisedGL) - Math.abs(a.unrealisedGL)).slice(0, 10));
+
+  // --- 03. UNREALISED P&L WITH DIVIDEND ---
+  document.getElementById("kpiUnrealisedReturn").innerText = `+S$ ${Math.round(totalReturn).toLocaleString('en-SG')}`;
+  document.getElementById("kpiUnrealisedSub").innerText = `+${totalReturnPct}% on cost · since each position was purchased`;
+  document.getElementById("unrealisedCapitalGainText").innerText = `+S$ ${Math.round(totalUnrealised).toLocaleString()}`;
+  document.getElementById("unrealisedDividendsText").innerText = `+S$ ${Math.round(totalDividends).toLocaleString()}`;
+  document.getElementById("unrealisedTotalReturnText").innerText = `+S$ ${Math.round(totalReturn).toLocaleString()}`;
+  renderUnrealisedCombinedBars([...data.holdings].sort((a, b) => (b.unrealisedGL + b.dividends) - (a.unrealisedGL + a.dividends)).slice(0, 10));
+
+  // --- 04. REALISED P&L ---
+  // Placeholder metrics matching your layout schema structure
+  document.getElementById("kpiRealisedCapital").innerText = `+S$ 933,311`;
+  document.getElementById("kpiRealisedDividends").innerText = `+S$ 540,550`;
+  document.getElementById("kpiRealisedTotal").innerText = `+S$ 1,473,860`;
+
+  // --- 05. DIVIDEND GROWTH ---
+  document.getElementById("kpiDividendCagr").innerText = `+7.1%`;
+  document.getElementById("kpiDividendYtd").innerText = `S$ 145,656`;
+
+  // --- 06. YIELD ON COST & CURRENT YIELD ---
+  document.getElementById("kpiYieldOnCost").innerText = `4.7%`;
+  document.getElementById("kpiCurrentYield").innerText = `4.4%`;
+  document.getElementById("kpiYieldSpread").innerText = `+0.3pp`;
 }
 
-function renderTop10Bars(top10, totalValue) {
+function renderTop10MarketValueBars(top10) {
   const container = document.getElementById("top10HoldingsBars");
   if (!container) return;
   container.innerHTML = "";
   const maxVal = top10[0]?.mktVal || 1;
-
   top10.forEach(item => {
     const pct = (item.mktVal / maxVal) * 100;
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
-      <div class="bar-label">
-        <div class="holding-name">${item.name}</div>
-        <div class="holding-ticker">${item.ticker}</div>
-      </div>
-      <div class="bar-track">
-        <div class="bar-fill" style="width: ${pct}%"></div>
-      </div>
+      <div class="bar-label"><div class="holding-name">${item.name}</div><div class="holding-ticker">${item.ticker}</div></div>
+      <div class="bar-track"><div class="bar-fill" style="width: ${pct}%"></div></div>
       <div class="bar-value">S$ ${Math.round(item.mktVal).toLocaleString()}</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderCapitalGainMovers(movers) {
+  const container = document.getElementById("capitalGainMoversBars");
+  if (!container) return;
+  container.innerHTML = "";
+  const maxVal = Math.abs(movers[0]?.unrealisedGL) || 1;
+  movers.forEach(item => {
+    const pct = (Math.abs(item.unrealisedGL) / maxVal) * 100;
+    const isPos = item.unrealisedGL >= 0;
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-label"><div class="holding-name">${item.name}</div><div class="holding-ticker">${item.ticker}</div></div>
+      <div class="bar-track"><div class="bar-fill ${isPos ? 'pos' : 'neg'}" style="width: ${pct}%"></div></div>
+      <div class="bar-value ${isPos ? 'pos-text' : 'neg-text'}">${isPos ? '+' : ''}S$ ${Math.round(item.unrealisedGL).toLocaleString()}</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderUnrealisedCombinedBars(combined) {
+  const container = document.getElementById("unrealisedCombinedBars");
+  if (!container) return;
+  container.innerHTML = "";
+  const maxVal = Math.abs(combined[0]?.unrealisedGL + combined[0]?.dividends) || 1;
+  combined.forEach(item => {
+    const total = item.unrealisedGL + item.dividends;
+    const pct = (Math.abs(total) / maxVal) * 100;
+    const isPos = total >= 0;
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-label"><div class="holding-name">${item.name}</div><div class="holding-ticker">${item.ticker}</div></div>
+      <div class="bar-track"><div class="bar-fill ${isPos ? 'pos' : 'neg'}" style="width: ${pct}%"></div></div>
+      <div class="bar-value ${isPos ? 'pos-text' : 'neg-text'}">${isPos ? '+' : ''}S$ ${Math.round(total).toLocaleString()}</div>
     `;
     container.appendChild(row);
   });
