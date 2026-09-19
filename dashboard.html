@@ -23,7 +23,7 @@
                     <span class="status-dot"></span> Live · from your workbook
                 </div>
             </div>
-            <div class="pulled-text">Pulled 18 Sept 2026</div>
+            <div class="pulled-text" id="lastPulled">Pulled 18 Sept 2026</div>
 
             <!-- Navigation Tabs -->
             <div class="tab-nav">
@@ -41,8 +41,8 @@
             <div class="grid-2col">
                 <div class="card">
                     <div class="card-label">PORTFOLIO VALUE</div>
-                    <div class="card-metric">S$5,271,425</div>
-                    <div class="card-sub">26 holdings · +S$599,856 cash on the side</div>
+                    <div class="card-metric" id="kpiPortfolioValue">S$5,271,425</div>
+                    <div class="card-sub" id="kpiHoldingsCount">26 holdings · +S$599,856 cash on the side</div>
                 </div>
                 <div class="card">
                     <div class="card-label">UNREALISED RETURN</div>
@@ -94,23 +94,7 @@
                     <div class="bar-subtitle">in home currency (SGD)</div>
                     
                     <div id="top10HoldingsBars" class="bars-container">
-                        <!-- Dynamically populated rows -->
-                        <div class="bar-row">
-                            <div class="bar-label-group">
-                                <div class="holding-name">Vanguard Australian Sh...</div>
-                                <div class="holding-ticker">VHY.AX</div>
-                            </div>
-                            <div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div>
-                            <div class="bar-value">S$967,429</div>
-                        </div>
-                        <div class="bar-row">
-                            <div class="bar-label-group">
-                                <div class="holding-name">iShares UK Dividend U...</div>
-                                <div class="holding-ticker">IUKD.L</div>
-                            </div>
-                            <div class="bar-track"><div class="bar-fill" style="width: 77%;"></div></div>
-                            <div class="bar-value">S$749,809</div>
-                        </div>
+                        <!-- Dynamically populated rows from app.js will stream in here -->
                     </div>
                 </div>
             </div>
