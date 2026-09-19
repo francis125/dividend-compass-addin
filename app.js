@@ -22,7 +22,8 @@ function initTabs() {
 async function fetchExcelData() {
   await Excel.run(async (context) => {
     const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
-    const poRange = poSheet.getUsedRange().load("values");
+    // Explicitly grab A1:N35 to guarantee we capture all tickers, values, and columns
+    const poRange = poSheet.getRange("A1:N35").load("values");
     await context.sync();
 
     const poData = parsePortfolioOverview(poRange.values);
