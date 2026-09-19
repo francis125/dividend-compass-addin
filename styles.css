@@ -247,6 +247,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    max-height: 380px;  /* Added to allow all 10 bars to fit nicely */
+    overflow-y: auto;   /* Enables smooth scrolling */
+    padding-right: 4px; /* Prevents scrollbar overlap */
 }
 
 .bar-row {
