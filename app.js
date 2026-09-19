@@ -40,13 +40,17 @@ function parsePortfolioOverview(rows) {
   const holdings = [];
   let cashBalance = 599856; 
 
-  // Rows 5 to 30 correspond to array indices 4 through 29
-  for (let i = 4; i <= 29; i++) {
+  // Loop dynamically through every row returned in the A1:N35 range
+  for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
     
-    const ticker = row[1]; // Column B
-    const name = row[2];   // Column C
+    const ticker = row[1] ? String(row[1]).trim() : ""; // Column B
+    const name = row[2] ? String(row[2]).trim() : "";   // Column C
+    
+    // Stop if we hit empty rows, headers, or the footer summary row
+    if (!ticker || ticker === "Ticker" || ticker.startsWith("SGD")) continue;
+
     const price = formalismNumber(row[3]); // Column D
     const shares = formalismNumber(row[4]); // Column E
     const cost = formalismNumber(row[5]);   // Column F
@@ -55,7 +59,7 @@ function parsePortfolioOverview(rows) {
     const type = row[8] || "Stock";         // Column I
     const dividends = formalismNumber(row[12]); // Column M (Dividend SGD)
 
-    if (ticker && mktVal > 0) {
+    if (mktVal > 0) {
       const totalCostVal = shares * cost;
       const unrealisedGL = mktVal - totalCostVal;
       holdings.push({ ticker, name, shares, cost: totalCostVal, price, mktVal, country, type, unrealisedGL, dividends });
