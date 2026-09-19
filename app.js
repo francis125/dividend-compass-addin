@@ -21,12 +21,14 @@ function initTabs() {
 
 async function fetchExcelData() {
   await Excel.run(async (context) => {
-    // Target the correct worksheet
+    // Target the Portfolio Overview sheet where your holdings live
     const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
     const poRange = poSheet.getUsedRange().load("values");
     await context.sync();
 
-    // Parse the portfolio data rows dynamically
+    console.log("Raw Excel Data Loaded:", poRange.values);
+
+    // Parse data dynamically
     const poData = parsePortfolioOverview(poRange.values);
 
     // Render components
@@ -44,7 +46,7 @@ function parsePortfolioOverview(rows) {
   let cashBalance = 0;
   let headerRowIndex = -1;
 
-  // Scan dynamically to find the header row containing 'ticker' or 'symbol'
+  // Dynamically find the header row by looking for 'ticker' or 'symbol'
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (row.some(cell => typeof cell === 'string' && (cell.toLowerCase().includes('ticker') || cell.toLowerCase().includes('symbol')))) {
@@ -53,9 +55,12 @@ function parsePortfolioOverview(rows) {
     }
   }
 
-  if (headerRowIndex === -1) return { holdings, cashBalance };
+  if (headerRowIndex === -1) {
+    console.warn("Could not find header row containing 'ticker' or 'symbol'");
+    return { holdings, cashBalance };
+  }
 
-  // Parse data rows below the header
+  // Parse all rows underneath the detected header
   for (let i = headerRowIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     const ticker = row[1];
@@ -68,6 +73,7 @@ function parsePortfolioOverview(rows) {
       holdings.push({ ticker, name, mktVal, country, type });
     }
   }
+
   return { holdings, cashBalance };
 }
 
