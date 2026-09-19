@@ -63,14 +63,12 @@ function parsePortfolioOverview(rows) {
 }
 
 function parseDashboardMetrics(unrlRows, divRows, poData) {
-  // Pull totals from your summary calculation cells (adjust row/col indices if your layout differs)
   let unrealisedGain = 0;
   let costBasis = 0;
   let annualDiv = 0;
 
-  // Example parsing for summary rows (typically found near the top of the sheets)
+  // Scan Unrealized P&L sheet for totals if available
   try {
-    // Scans Unrealized P&L sheet for total gain/loss values
     for (let r = 0; r < unrlRows.length; r++) {
       for (let c = 0; c < unrlRows[r].length; c++) {
         if (unrlRows[r][c] === "Total Unrealised P&L" || unrlRows[r][c] === "Total Gain / Loss") {
