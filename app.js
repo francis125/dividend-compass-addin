@@ -21,72 +21,68 @@ function initTabs() {
 
 async function fetchExcelData() {
   await Excel.run(async (context) => {
-    // Target the Portfolio Overview sheet where your holdings live
-    const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
-    const poRange = poSheet.getUsedRange().load("values");
+    // Explicitly target Portfolio Overview regardless of active tab
+    const sheet = context.workbook.worksheets.getItem("Portfolio Overview");
+    const range = sheet.getUsedRange().load("values");
     await context.sync();
 
-    console.log("Raw Excel Data Loaded:", poRange.values);
+    const rows = range.values;
+    console.log("Raw rows loaded from Portfolio Overview:", rows);
 
-    // Parse data dynamically
-    const poData = parsePortfolioOverview(poRange.values);
+    let holdings = [];
+    let cashBalance = 0;
+    let headerIndex = -1;
 
-    // Render components
-    renderKPIs(poData);
-    renderHoldingsCharts(poData);
+    // Find the exact header row dynamically
+    for (let i = 0; i < rows.length; i++) {
+      const rowText = rows[i].join(" ").toLowerCase();
+      if (rowText.includes("ticker") || rowText.includes("symbol")) {
+        headerIndex = i;
+        break;
+      }
+    }
 
-    document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    // Fallback if header label isn't found
+    const startRow = headerIndex !== -1 ? headerIndex + 1 : 4;
+
+    for (let i = startRow; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+
+      // Adjust column indices based on standard layout (Ticker=1, Name=2, MktVal=6, Country=7, Type=8)
+      const ticker = row[1] ? String(row[1]).trim() : "";
+      const name = row[2] ? String(row[2]).trim() : ticker;
+      const mktVal = parseFloat(row[6]) || 0;
+      const country = row[7] ? String(row[7]).trim() : "SG";
+      const type = row[8] ? String(row[8]).trim() : "Stock";
+
+      if (ticker && mktVal > 0 && !ticker.toLowerCase().includes("total")) {
+        holdings.push({ ticker, name, mktVal, country, type });
+      }
+    }
+
+    console.log("Successfully parsed holdings:", holdings);
+
+    renderKPIs({ holdings, cashBalance });
+    renderHoldingsCharts({ holdings, cashBalance });
+
+    document.getElementById("lastPulled").innerText = `Pulled ${new Date().toLocaleTimeString()}`;
   }).catch((error) => {
-    console.error("Error reading workbook data:", error);
+    console.error("Excel data read error:", error);
   });
-}
-
-function parsePortfolioOverview(rows) {
-  let holdings = [];
-  let cashBalance = 0;
-  let headerRowIndex = -1;
-
-  // Dynamically find the header row by looking for 'ticker' or 'symbol'
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (row.some(cell => typeof cell === 'string' && (cell.toLowerCase().includes('ticker') || cell.toLowerCase().includes('symbol')))) {
-      headerRowIndex = i;
-      break;
-    }
-  }
-
-  if (headerRowIndex === -1) {
-    console.warn("Could not find header row containing 'ticker' or 'symbol'");
-    return { holdings, cashBalance };
-  }
-
-  // Parse all rows underneath the detected header
-  for (let i = headerRowIndex + 1; i < rows.length; i++) {
-    const row = rows[i];
-    const ticker = row[1];
-    const name = row[2];
-    const mktVal = parseFloat(row[6]) || 0;
-    const country = row[7];
-    const type = row[8];
-
-    if (ticker && mktVal > 0) {
-      holdings.push({ ticker, name, mktVal, country, type });
-    }
-  }
-
-  return { holdings, cashBalance };
 }
 
 function renderKPIs(data) {
   const totalValue = data.holdings.reduce((sum, h) => sum + h.mktVal, 0) + data.cashBalance;
-  document.getElementById("kpiPortfolioValue").innerText = `S$ ${totalValue.toLocaleString('en-SG', { maximumFractionDigits: 0 })}`;
-  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings · S$ ${data.cashBalance.toLocaleString()} cash on the side`;
+  document.getElementById("kpiPortfolioValue").innerText = `S$ ${Math.round(totalValue).toLocaleString()}`;
+  document.getElementById("kpiHoldingsCount").innerText = `${data.holdings.length} holdings loaded`;
   document.getElementById("holdingsTotalPos").innerText = data.holdings.length;
 }
 
 function renderHoldingsCharts(data) {
   const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
   const container = document.getElementById("top10HoldingsBars");
+  if (!container) return;
   container.innerHTML = "";
   const maxVal = top10[0]?.mktVal || 1;
 
