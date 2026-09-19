@@ -22,7 +22,7 @@ function initTabs() {
 async function fetchExcelData() {
   await Excel.run(async (context) => {
     const poSheet = context.workbook.worksheets.getItem("Portfolio Overview");
-    // Explicitly grab A1:N35 to guarantee we capture all tickers, values, and columns
+    // Explicitly grab A1:N35 to capture all headers, holdings, and footers cleanly
     const poRange = poSheet.getRange("A1:N35").load("values");
     await context.sync();
 
@@ -40,29 +40,41 @@ function parsePortfolioOverview(rows) {
   const holdings = [];
   let cashBalance = 599856; 
 
-  // Loop dynamically through every row returned in the A1:N35 range
+  // Loop through rows 5 onwards (array index 4 is row 5)
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
     
-    const ticker = row[1] ? String(row[1]).trim() : ""; // Column B
-    const name = row[2] ? String(row[2]).trim() : "";   // Column C
+    // Column B is Ticker (index 1), Column C is Company Name (index 2)
+    const ticker = row[1] ? String(row[1]).trim() : "";
+    const name = row[2] ? String(row[2]).trim() : "";
     
-    // Stop if we hit empty rows, headers, or the footer summary row
-    if (!ticker || ticker === "Ticker" || ticker.startsWith("SGD")) continue;
+    // Stop processing if we hit empty rows, headers, or the bottom summary row
+    if (!ticker || ticker === "Ticker" || ticker.toUpperCase().startsWith("SGD")) break;
 
-    const price = formalismNumber(row[3]); // Column D
-    const shares = formalismNumber(row[4]); // Column E
-    const cost = formalismNumber(row[5]);   // Column F
-    const mktVal = formalismNumber(row[6]); // Column G (Mkt Value SGD)
-    const country = row[7] || "SG";         // Column H
-    const type = row[8] || "Stock";         // Column I
-    const dividends = formalismNumber(row[12]); // Column M (Dividend SGD)
+    const price = formalismNumber(row[3]);      // Column D: Last Price
+    const shares = formalismNumber(row[4]);     // Column E: Units
+    const cost = formalismNumber(row[5]);       // Column F: Avg Cost
+    const mktVal = formalismNumber(row[6]);     // Column G: Mkt Value SGD
+    const country = row[7] || "SG";             // Column H: Country
+    const type = row[8] || "Stock";             // Column I: Type
+    const dividends = formalismNumber(row[12]); // Column M: Dividend SGD
 
     if (mktVal > 0) {
       const totalCostVal = shares * cost;
       const unrealisedGL = mktVal - totalCostVal;
-      holdings.push({ ticker, name, shares, cost: totalCostVal, price, mktVal, country, type, unrealisedGL, dividends });
+      holdings.push({ 
+        ticker, 
+        name, 
+        shares, 
+        cost: totalCostVal, 
+        price, 
+        mktVal, 
+        country, 
+        type, 
+        unrealisedGL, 
+        dividends 
+      });
     }
   }
 
@@ -70,6 +82,7 @@ function parsePortfolioOverview(rows) {
 }
 
 function formalismNumber(val) {
+  if (val === undefined || val === null) return 0;
   return parseFloat(String(val).replace(/,/g, '')) || 0;
 }
 
@@ -80,7 +93,7 @@ function renderKPIs(data) {
 }
 
 function renderHoldingsCharts(data) {
-  // Sort descending by market value and strictly limit to top 10 items
+  // Sort descending by market value and take the top 10 items
   const top10 = [...data.holdings].sort((a, b) => b.mktVal - a.mktVal).slice(0, 10);
   const container = document.getElementById("top10HoldingsBars");
   if (!container) return;
