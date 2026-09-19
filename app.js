@@ -53,7 +53,7 @@ function parsePortfolioOverview(rows) {
     const mktVal = formalismNumber(row[6]); // Column G (Mkt Value SGD)
     const country = row[7] || "SG";         // Column H
     const type = row[8] || "Stock";         // Column I
-    const dividends = formalismNumber(row[10]); // Column K
+    const dividends = formalismNumber(row[12]); // Column M (Dividend SGD)
 
     if (ticker && mktVal > 0) {
       const totalCostVal = shares * cost;
