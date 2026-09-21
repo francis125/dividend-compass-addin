@@ -642,14 +642,18 @@
     list.forEach(function (d) {
       var v = valueFn(d);
       var isGain = v >= 0;
-      var w = (max ? Math.abs(v) / max * 100 : 0) + "%";
+      // Half-width (0-50%) on either side of the centre axis at 50%.
+      var halfW = (max ? Math.abs(v) / max * 50 : 0);
+      var fillLeft = isGain ? "50%" : (50 - halfW) + "%";
+      var fillWidth = halfW + "%";
       var row = document.createElement("div");
       row.className = "row";
       row.innerHTML =
         '<div class="name">' + d.name + (subFn ? "<small>" + subFn(d) + "</small>" : "") + "</div>" +
-        '<div class="dtrack l">' + (!isGain ? '<div class="dfill loss num" style="width:' + w + '"></div>' : "") + "</div>" +
-        '<div class="axis"></div>' +
-        '<div class="dtrack r">' + (isGain ? '<div class="dfill gain num" style="width:' + w + '"></div>' : "") + "</div>" +
+        '<div class="dtrack">' +
+          '<div class="axis"></div>' +
+          '<div class="dfill ' + (isGain ? "gain" : "loss") + ' num" style="left:' + fillLeft + '; width:' + fillWidth + ';"></div>' +
+        "</div>" +
         '<div class="val num ' + (isGain ? "up" : "down") + '">' + signed(v) + "</div>";
       var fillEl = row.querySelector(".dfill");
       if (fillEl) {
