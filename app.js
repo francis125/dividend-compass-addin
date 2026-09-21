@@ -607,7 +607,7 @@
       bar.appendChild(seg);
 
       var li = document.createElement("li");
-      li.innerHTML = '<i style="background:' + d.color + '"></i><span class="lname">' + d.name + '</span><span class="lval num">' + pct2(pct) + "% &middot; $" + fmt(d.value) + "</span>";
+      li.innerHTML = '<i style="background:' + d.color + '"></i><span class="lname">' + d.name + '</span><span class="lpct num">' + pct2(pct) + '%</span><span class="lval num">$' + fmt(d.value) + "</span>";
       legend.appendChild(li);
     });
   }
