@@ -511,6 +511,25 @@
     renderRealised(data);
     renderGrowth(data);
     renderYield(data);
+
+    // Some embedded WebViews — notably the one macOS desktop Excel uses to
+    // host taskpanes — don't reliably reflow after this many DOM inserts
+    // land in one burst (Office.js resolves the whole live-data read at
+    // once, so all ten render* calls above fire back-to-back). Left alone,
+    // that shows up as sections visually overlapping their neighbours
+    // until something else forces a relayout (e.g. resizing the pane).
+    // Forcing a synchronous reflow now, and once more on the next frame,
+    // reliably clears it without any visible flash.
+    forceReflow();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(forceReflow);
+  }
+
+  function forceReflow() {
+    if (!document.body) return;
+    var prevDisplay = document.body.style.display;
+    document.body.style.display = "none";
+    void document.body.offsetHeight; // eslint-disable-line no-unused-expressions
+    document.body.style.display = prevDisplay;
   }
 
   function renderKpis(data) {
