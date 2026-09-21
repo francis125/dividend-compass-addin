@@ -255,7 +255,8 @@
     var geoMix = rows(r, "poGeoMix")
       .filter(function (row) { return str(row[0]); })
       .map(function (row) { return { name: regionName(str(row[0])), code: str(row[0]), value: num(row[1]) }; });
-    if (cashOnSide) geoMix.push({ name: "Cash", code: "Multi-ccy", value: cashOnSide });
+    // Cash is intentionally excluded from Geographic mix — that chart is
+    // equity exposure by region only.
 
     // ---- Dividend Ledger: dividends attributable to CLOSED lots, per company
     // Realised P&L Dashboard's own G/H "Divs Rcvd" columns are never
@@ -289,7 +290,7 @@
       return { y: str(row[0]), v: num(row[9]) };
     });
     for (var i = 0; i < years.length; i++) {
-      years[i].g = i > 0 && years[i - 1].v ? +(((years[i].v - years[i - 1].v) / years[i - 1].v) * 100).toFixed(2) : null;
+      years[i].g = i > 0 && years[i - 1].v ? ((years[i].v - years[i - 1].v) / years[i - 1].v) * 100 : null;
       if (parseInt(years[i].y, 10) === nowYear) { years[i].ytd = true; years[i].g = null; }
     }
 
@@ -403,8 +404,7 @@
       { name: "United States", code: "US", value: 551207 },
       { name: "Europe", code: "EU", value: 205839 },
       { name: "India", code: "IN", value: 146427 },
-      { name: "Japan", code: "JP", value: 0 },
-      { name: "Cash", code: "Multi-ccy", value: 599856 }
+      { name: "Japan", code: "JP", value: 0 }
     ];
 
     var realisedTotals = [
@@ -727,12 +727,12 @@
       var col = document.createElement("div");
       col.className = "yr";
       col.innerHTML =
-        (y.g ? '<div class="yr-growth">+' + y.g + "%</div>" : (y.ytd ? '<div class="yr-growth" style="color:var(--ink-3);">YTD</div>' : '<div class="yr-growth">&nbsp;</div>')) +
+        (y.g != null ? '<div class="yr-growth">' + signedPct2(y.g) + "%</div>" : (y.ytd ? '<div class="yr-growth" style="color:var(--ink-3);">YTD</div>' : '<div class="yr-growth">&nbsp;</div>')) +
         '<div class="yr-val num">S$' + fmt(y.v) + "</div>" +
         '<div class="yr-bar num' + (y.ytd ? " ytd" : "") + '" style="height:' + h + 'px"></div>' +
         '<div class="yr-label">' + y.y + (y.ytd ? "<small>year to date</small>" : "") + "</div>";
       var bar = col.querySelector(".yr-bar");
-      bar.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.y + (y.ytd ? " (year to date)" : "") + "</b>S$" + fmt(y.v) + (y.g ? " &middot; +" + y.g + "% vs prior year" : "")); });
+      bar.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.y + (y.ytd ? " (year to date)" : "") + "</b>S$" + fmt(y.v) + (y.g != null ? " &middot; " + signedPct2(y.g) + "% vs prior year" : "")); });
       bar.addEventListener("mouseleave", hideTip);
       el.appendChild(col);
     });
