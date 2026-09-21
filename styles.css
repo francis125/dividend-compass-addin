@@ -63,6 +63,13 @@ a{ color:inherit; }
   position:sticky; top:env(safe-area-inset-top,0px); z-index:20;
   background:var(--bg); border-bottom:1px solid var(--border);
   padding-block:16px 0;
+  /* Force this sticky element onto its own compositing layer. Some
+     embedded WebView engines (older desktop Office taskpane hosts) mis-
+     invalidate other layers when scrolling past a position:sticky
+     element, leaving ghosted/overlapping content behind. Promoting it
+     avoids that repaint bug. */
+  transform:translateZ(0);
+  will-change:transform;
 }
 .topbar-inner{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-bottom:14px; }
 .brand{ display:flex; align-items:center; gap:10px; }
@@ -110,7 +117,13 @@ main{ padding-bottom:64px; }
 .up{ color:var(--gain); } .down{ color:var(--loss); }
 
 /* ---------- sections ---------- */
-section.block{ padding-block:34px; border-top:1px solid var(--border); }
+section.block{
+  padding-block:34px; border-top:1px solid var(--border);
+  /* Same GPU-layer promotion as .topbar — gives each section its own
+     paint layer so it repaints cleanly instead of showing stale content
+     from a section scrolled past it. */
+  transform:translateZ(0);
+}
 .sec-head{ margin-bottom:20px; }
 .sec-head h2{ font-size:22px; font-weight:600; }
 .sec-head p{ margin:5px 0 0; font-size:13.5px; color:var(--ink-2); max-width:56ch; line-height:1.5; }
