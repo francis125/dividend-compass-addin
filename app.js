@@ -584,9 +584,9 @@
       var pct = pct2(h.mv / data.totalMv * 100);
       var cls = h.gl >= 0 ? "up" : "down";
       return "<tr><td>" + h.name + '</td><td class="tkr">' + h.tkr + '</td><td class="num">S$' + fmt(h.mv) + '</td><td class="num">' + pct + '%</td>' +
-        '<td class="num ' + cls + '">' + signed(h.gl) + " (" + signedPct2(h.glp) + "%)</td></tr>";
+        '<td class="num ' + cls + '">' + signedSgd(h.gl) + " (" + signedPct2(h.glp) + "%)</td></tr>";
     }).join("");
-    var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num">S$' + fmt(data.totalMv) + '</td><td class="num">100%</td><td class="num up">' + signed(data.totalCapGl) + "</td></tr>";
+    var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num">S$' + fmt(data.totalMv) + '</td><td class="num">100%</td><td class="num up">' + signedSgd(data.totalCapGl) + "</td></tr>";
     t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
   }
 
@@ -654,10 +654,10 @@
           '<div class="axis"></div>' +
           '<div class="dfill ' + (isGain ? "gain" : "loss") + ' num" style="left:' + fillLeft + '; width:' + fillWidth + ';"></div>' +
         "</div>" +
-        '<div class="val num ' + (isGain ? "up" : "down") + '">' + signed(v) + "</div>";
+        '<div class="val num ' + (isGain ? "up" : "down") + '">' + signedSgd(v) + "</div>";
       var fillEl = row.querySelector(".dfill");
       if (fillEl) {
-        fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (isGain ? "Gain: " : "Loss: ") + signed(v)); });
+        fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (isGain ? "Gain: " : "Loss: ") + signedSgd(v)); });
         fillEl.addEventListener("mouseleave", hideTip);
       }
       el.appendChild(row);
@@ -691,11 +691,11 @@
       var thead = "<thead><tr><th>Holding</th><th>Ticker</th><th>Capital G/L</th><th>Dividends</th><th>Total return</th></tr></thead>";
       var rows = data.unrealisedTotals.map(function (h) {
         return "<tr><td>" + h.name + '</td><td class="tkr">' + h.tkr + '</td>' +
-          '<td class="num ' + (h.cap >= 0 ? "up" : "down") + '">' + signed(h.cap) + "</td>" +
+          '<td class="num ' + (h.cap >= 0 ? "up" : "down") + '">' + signedSgd(h.cap) + "</td>" +
           '<td class="num" style="color:var(--div);">+S$' + fmt(h.div) + "</td>" +
-          '<td class="num ' + (h.total >= 0 ? "up" : "down") + '">' + signed(h.total) + "</td></tr>";
+          '<td class="num ' + (h.total >= 0 ? "up" : "down") + '">' + signedSgd(h.total) + "</td></tr>";
       }).join("");
-      var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num up">' + signed(data.totalCapGl) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.totalDivRcvd) + '</td><td class="num up">' + signed(total) + "</td></tr>";
+      var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num up">' + signedSgd(data.totalCapGl) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.totalDivRcvd) + '</td><td class="num up">' + signedSgd(total) + "</td></tr>";
       t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
     }
   }
@@ -712,11 +712,11 @@
       var thead = "<thead><tr><th>Holding</th><th>Closed</th><th>Capital G/L</th><th>Dividends</th><th>Total return</th></tr></thead>";
       var rows = data.realisedTotals.map(function (r) {
         return "<tr><td>" + r.name + '</td><td class="tkr">' + r.date.replace("Closed ", "") + '</td>' +
-          '<td class="num ' + (r.cap >= 0 ? "up" : "down") + '">' + signed(r.cap) + "</td>" +
+          '<td class="num ' + (r.cap >= 0 ? "up" : "down") + '">' + signedSgd(r.cap) + "</td>" +
           '<td class="num" style="color:var(--div);">+S$' + fmt(r.div) + "</td>" +
-          '<td class="num ' + (r.total >= 0 ? "up" : "down") + '">' + signed(r.total) + "</td></tr>";
+          '<td class="num ' + (r.total >= 0 ? "up" : "down") + '">' + signedSgd(r.total) + "</td></tr>";
       }).join("");
-      var totalRow = '<tr class="total"><td>All closed positions</td><td></td><td class="num up">' + signed(data.realisedSummary.cap) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.realisedSummary.div) + '</td><td class="num up">' + signed(data.realisedSummary.total) + "</td></tr>";
+      var totalRow = '<tr class="total"><td>All closed positions</td><td></td><td class="num up">' + signedSgd(data.realisedSummary.cap) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.realisedSummary.div) + '</td><td class="num up">' + signedSgd(data.realisedSummary.total) + "</td></tr>";
       t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
     }
   }
