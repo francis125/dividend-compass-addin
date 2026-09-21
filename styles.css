@@ -113,12 +113,13 @@ main{ padding-bottom:64px; }
 .hero{ padding-block:26px 8px; }
 .hero-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
 .kpi{
+  min-width:0;
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
   padding:16px 18px; box-shadow:var(--shadow);
 }
 .kpi-label{ font-size:12px; color:var(--ink-3); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.kpi-value{ font-family:"Fraunces",serif; font-size:26px; font-weight:600; margin-top:6px; line-height:1.1; }
-.kpi-sub{ font-size:12.5px; color:var(--ink-2); margin-top:5px; }
+.kpi-value{ font-family:"Fraunces",serif; font-size:26px; font-weight:600; margin-top:6px; line-height:1.1; overflow-wrap:break-word; }
+.kpi-sub{ font-size:12.5px; color:var(--ink-2); margin-top:5px; overflow-wrap:break-word; }
 .kpi-source{ font-size:10px; color:var(--ink-3); opacity:.75; margin-top:8px; letter-spacing:.01em; }
 .up{ color:var(--gain); } .down{ color:var(--loss); }
 
@@ -148,12 +149,13 @@ section.block{
 .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
 .card-pad{ padding:20px; }
 .grid-2{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; align-items:start; }
+.grid-2 > *{ min-width:0; }
 .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
 .stat-row.two{ grid-template-columns:repeat(2,1fr); }
-.stat{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
+.stat{ min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
 .stat-label{ font-size:11.5px; color:var(--ink-3); font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
-.stat-value{ font-family:"Fraunces",serif; font-size:19px; font-weight:600; margin-top:4px; }
-.stat-sub{ font-size:12px; color:var(--ink-2); margin-top:3px; }
+.stat-value{ font-family:"Fraunces",serif; font-size:19px; font-weight:600; margin-top:4px; overflow-wrap:break-word; }
+.stat-sub{ font-size:12px; color:var(--ink-2); margin-top:3px; overflow-wrap:break-word; }
 
 .card-title{ font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
 .card-note{ font-size:12px; color:var(--ink-3); margin-bottom:14px; }
@@ -270,6 +272,10 @@ footer strong{ color:var(--ink-2); }
   .divlist .row{ grid-template-columns:104px 1fr 62px; gap:8px; }
   .dumblist .row{ grid-template-columns:104px 1fr 104px; gap:8px; }
   .brand-text p{ display:none; }
+}
+@media (max-width:400px){
+  .hero-grid{ grid-template-columns:1fr; }
+  .kpi-value{ font-size:23px; }
 }
 
 /* ---------- responsive tables (stacked cards, no horizontal scroll) ---------- */
