@@ -681,7 +681,7 @@
     setText("stat-u-div", "+$" + fmt(data.totalDivRcvd));
     var total = data.totalCapGl + data.totalDivRcvd;
     setText("stat-u-total", signedSgd(total));
-    setText("stat-u-total-pct", signedPct2(data.kpi.unrealisedReturnPct) + "% on cost · since each position was purchased");
+    setText("stat-u-total-pct", signedPct2(data.kpi.unrealisedReturnPct) + "% on cost");
 
     var top10 = data.unrealisedTotals.slice().sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); }).slice(0, 10);
     renderDiverging("chart-unrealised", top10, function (h) { return h.total; }, function (h) { return h.tkr; });
