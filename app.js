@@ -3,79 +3,92 @@
    Rendering (charts, tables, KPIs) is a faithful port of the approved
    design template. Data can come from two places:
 
-     1. LIVE  — read out of the open workbook's "Main Dashboard" tab via
-        Office.js, using the RANGES config below. Main Dashboard already
-        computes every figure this page needs (Sections 01-08 built with
-        plain formulas), so this page just reads finished values — it does
-        not re-derive anything from Portfolio Overview.
+     1. LIVE  — read directly out of the workbook's own source-of-truth
+        sheets via Office.js (SHEETS/RANGES config below), not from any
+        pre-computed dashboard tab:
+          - Portfolio Overview        — holdings, weightings, asset mix,
+                                         geographic mix, cash, portfolio/
+                                         cash/grand totals
+          - Unrealized P&L Dashboard  — per-holding capital G/L, dividends
+                                         received on open positions, and
+                                         the portfolio-wide totals row
+          - Realised P&L Dashboard    — per-company closed-position P/L
+                                         and the grand-total closed P/L
+          - Dividend Dashboard        — year-by-year dividend income
+                                         (also used to derive lifetime
+                                         dividends, cross-checked against
+                                         the Dividend Ledger)
+          - YoC Calc (Do Not Edit)    — per-holding and portfolio-level
+                                         yield on cost / current yield
+                                         (TTM), which this workbook already
+                                         maintains as the refined source
+        All five layouts were confirmed directly against an uploaded copy
+        of the workbook (FrancisAcc v97), not guessed.
      2. SAMPLE — the fallback data baked in below, used whenever Office.js
         isn't available (e.g. previewing this file directly in a browser)
         or a live read fails. The status badge in the header reflects
         which one is on screen.
 
-   NOTE: the exact cell addresses in RANGES are placeholders and need to be
-   confirmed against the current "Main Dashboard" tab layout (cells were
-   recently realigned) before this will pull real numbers. Until then the
-   page runs correctly on sample data. Update RANGES, then everything else
-   below works unchanged.
+   If you rename a sheet, or reorder/insert columns in one of the ranges
+   below, update SHEETS/RANGES to match — everything else keeps working
+   unchanged since rendering is driven entirely off the data shape, not
+   cell addresses.
    ------------------------------------------------------------------------- */
 
 (function () {
   "use strict";
 
   // ===========================================================================
-  // 1. CONFIG — cell/range addresses on the "Main Dashboard" sheet.
-  //    Fill these in against the live workbook, then set USE_LIVE_DATA = true.
+  // 1. CONFIG — sheet names + ranges on the real source sheets.
   // ===========================================================================
-  var USE_LIVE_DATA = true; // flip to false to force sample data for a demo
-  var SHEET_NAME = "Main Dashboard";
+  var USE_LIVE_DATA = true;
+
+  var SHEETS = {
+    portfolioOverview: "Portfolio Overview",
+    unrealised:        "Unrealized P&L Dashboard",
+    realised:           "Realised P&L Dashboard",
+    dividends:          "Dividend Dashboard",
+    yocCalc:            "YoC Calc (Do Not Edit)"
+  };
 
   var RANGES = {
-    // Hero KPIs
-    portfolioValue:      "C6",
-    portfolioHoldingsN:  "C14",
-    cashOnSide:          "C7",
-    unrealisedReturn:    "F6",
-    unrealisedReturnPct: "F7",
-    divIncomeAnnual:     "C9",
-    divIncomeGrowthPct:  "C10",
-    yieldCurrent:        "F9",
-    yieldOnCost:         "G9",
+    // Portfolio Overview — 26 current holdings (row 5-30)
+    //   B Ticker | C Company | D Last price | E Units | F Avg cost | G Mkt value SGD |
+    //   H Country | I Type | J Weightage
+    poHoldings:  { sheet: "portfolioOverview", addr: "B5:J30" },
+    // Portfolio Segment summary — row50 Equity, row51 Cash, row53 Grand Total
+    //   G label | H Value SGD | I Weightage % | J Div % | K Div SGD
+    poSummary:   { sheet: "portfolioOverview", addr: "G50:K53" },
+    // Asset mix — K:Type, L:Allocation %, M:Allocation SGD (rows 57-60)
+    poAssetMix:  { sheet: "portfolioOverview", addr: "K57:M60" },
+    // Geographic mix (equity only) — D:Region, E:Value SGD (rows 57-64)
+    poGeoMix:    { sheet: "portfolioOverview", addr: "D57:E64" },
 
-    // 01 Holdings — top 10 table, columns: #, Holding, Ticker, MarketValue, %Portfolio, GLAmt, GLPct
-    holdingsTable:        "B17:H26",
-    statTotalPositions:   "C14",
-    statLargestPct:       "D14",
-    statLargestName:      "D15",
-    statTop5Pct:          "F14",
+    // Unrealized P&L Dashboard — per-holding (row 7-32)
+    //   B Company | C Brokerage | D Units | E AvgCostLC | F TotalCostLC | G TotalCostSGD |
+    //   H UnitCostLC | I MktValueSGD | J P/L SGD | K Return % | L DivsRcvdLC | M DivsRcvdSGD
+    uHoldings:   { sheet: "unrealised", addr: "B7:M32" },
+    // Grand-total row (row 160): G TotalCostSGD | I MktValueSGD | J P/L SGD | K Return % |
+    //   M DivsRcvdSGD | Q TotalReturnSGD | R TotalReturn %
+    uTotals:     { sheet: "unrealised", addr: "G160:R160" },
 
-    // 07/08 Asset mix + geographic mix (Sections 07-08 on Main Dashboard)
-    assetMixTable: "B53:D56",   // Asset Type | Allocation % | Market Value
-    geoMixTable:   "B60:D68",   // Region | Mix % | Value
+    // Realised P&L Dashboard — per-company closed positions (row 6-106)
+    //   B Company | C Txns | D UnitsSold | E TotalCostSGD | F ExitCostSGD |
+    //   G DivsRcvdLC | H DivsRcvdSGD | I ClosedP/LLC | J ClosedP/LSGD | K TotalReturnSGD | L Return%
+    rHoldings:   { sheet: "realised", addr: "B6:L106" },
+    rTotal:      { sheet: "realised", addr: "J137" }, // grand-total closed P/L SGD
 
-    // 02 Capital gain/loss
-    capGainTotal:    "C31",
-    capGainPct:      "C32",
-    positionsUp:     "C33",
-    positionsDown:   "C34",
-    capitalTable:    "B36:D45", // Name | Ticker | G/L amount, top movers
+    // Dividend Dashboard — year-by-year (row 7-26, 2007-2026)
+    //   B Year | K Total Div SGD
+    divYears:    { sheet: "dividends", addr: "B7:K26" },
 
-    // 03 Unrealised P&L with dividend
-    unrealisedTable: "B48:F58", // Name | Ticker | Capital G/L | Dividends | Total
-
-    // 04 Realised P&L with dividend
-    realisedCap:     "C41",
-    realisedDiv:     "F42",
-    realisedTotal:   "H41",
-    realisedTable:   "B44:F54",
-
-    // 05 Dividend growth YoY (dynamic array, last 5 years + YTD)
-    growthTable:     "B47:C53", // Year | Total Dividend | (growth % computed)
-
-    // 06 Yield on cost / current yield
-    yocPortfolio:    "F47",
-    curYieldPortfolio: "F48",
-    yieldTable:      "B60:D69" // Holding | Yield on cost | Current yield
+    // YoC Calc (Do Not Edit) — per-holding TTM yields (row 4-29, same 26 holdings/order as Portfolio Overview)
+    //   B Ticker | C Company | I Yield on Cost TTM | J Current Yield TTM
+    yocHoldings: { sheet: "yocCalc", addr: "B4:J29" },
+    // Portfolio-level totals block (rows 32-36)
+    //   D32 Portfolio YoC | D33 Portfolio Current Yield | D34 Implied Annual Div SGD |
+    //   D35 Total Mkt Value SGD | D36 Total Cost Basis SGD
+    yocTotals:   { sheet: "yocCalc", addr: "D32:D36" }
   };
 
   // ===========================================================================
@@ -92,10 +105,18 @@
     });
   } else {
     // Standalone preview (no Office host) — just render sample data.
-    document.addEventListener("DOMContentLoaded", function () {
+    // Guard against the script running after DOMContentLoaded already fired
+    // (e.g. a script tag at the end of the body) — in that case the event
+    // listener below would never fire and the page would sit empty.
+    var bootStandalone = function () {
       setStatus(false);
       renderAll(SAMPLE);
-    });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bootStandalone);
+    } else {
+      bootStandalone();
+    }
   }
 
   function init() {
@@ -130,16 +151,21 @@
   }
 
   // ===========================================================================
-  // 4. LIVE DATA — Office.js reads from Main Dashboard
+  // 4. LIVE DATA — Office.js reads straight from the source sheets
   // ===========================================================================
   function loadLiveData() {
     return Excel.run(function (context) {
-      var sheet = context.workbook.worksheets.getItem(SHEET_NAME);
+      var sheetCache = {};
+      function getSheet(key) {
+        if (!sheetCache[key]) sheetCache[key] = context.workbook.worksheets.getItem(SHEETS[key]);
+        return sheetCache[key];
+      }
       var loaded = {};
       Object.keys(RANGES).forEach(function (key) {
-        var r = sheet.getRange(RANGES[key]);
-        r.load("values");
-        loaded[key] = r;
+        var cfg = RANGES[key];
+        var rng = getSheet(cfg.sheet).getRange(cfg.addr);
+        rng.load("values");
+        loaded[key] = rng;
       });
       return context.sync().then(function () {
         return mapLiveRangesToData(loaded);
@@ -147,101 +173,173 @@
     });
   }
 
+  function num(x) { return typeof x === "number" ? x : 0; }
+  function str(x) { return x === null || x === undefined ? "" : String(x).trim(); }
+  function rows(r, key) { return (r[key] && r[key].values) || []; }
+
   function mapLiveRangesToData(r) {
-    function v(key) { return r[key] && r[key].values ? r[key].values[0][0] : null; }
-    function num(x) { return typeof x === "number" ? x : 0; }
+    var data = {};
 
-    var data = JSON.parse(JSON.stringify(SAMPLE)); // start from sample shape, overwrite with live values
+    // ---- Portfolio Overview: 26 current holdings ------------------------
+    // B Ticker | C Company | D LastPrice | E Units | F AvgCost | G MktValueSGD | H Country | I Type | J Weightage
+    var poRows = rows(r, "poHoldings")
+      .filter(function (row) { return str(row[1]); })
+      .map(function (row) {
+        return {
+          tkr: str(row[0]), name: str(row[1]), mv: num(row[5]),
+          country: str(row[6]), type: str(row[7]), weight: num(row[8])
+        };
+      });
+    var totalMv = poRows.reduce(function (a, h) { return a + h.mv; }, 0);
 
-    data.kpi.portfolioValue = num(v("portfolioValue"));
-    data.kpi.holdingsCount = num(v("statTotalPositions"));
-    data.kpi.cashOnSide = num(v("cashOnSide"));
-    data.kpi.unrealisedReturn = num(v("unrealisedReturn"));
-    data.kpi.unrealisedReturnPct = num(v("unrealisedReturnPct"));
-    data.kpi.divIncomeAnnual = num(v("divIncomeAnnual"));
-    data.kpi.divIncomeGrowthPct = num(v("divIncomeGrowthPct"));
-    data.kpi.yieldCurrent = num(v("yieldCurrent"));
-    data.kpi.yieldOnCost = num(v("yieldOnCost"));
+    // ---- Unrealized P&L Dashboard: per-holding cap G/L + dividends ------
+    // B Company | ... | G TotalCostSGD | ... | I MktValueSGD | J P/L SGD | K Return% | L DivsRcvdLC | M DivsRcvdSGD
+    var uRows = rows(r, "uHoldings").filter(function (row) { return str(row[0]); });
+    var uByName = {};
+    uRows.forEach(function (row) {
+      uByName[str(row[0])] = { cost: num(row[5]), mv: num(row[7]), gl: num(row[8]), glp: num(row[9]) * 100, div: num(row[11]) };
+    });
+    // uTotals spans the full contiguous range G160:R160 (12 columns: G..R),
+    // so every column in between is present in the row array even though we
+    // only care about a few of them — index by real column offset from G.
+    var uTotalsRow = rows(r, "uTotals")[0] || [];
+    // G=0 TotalCostSGD | H=1 | I=2 MktValueSGD | J=3 P/L SGD | K=4 Return% | L=5 |
+    // M=6 DivsRcvdSGD | N=7 | O=8 | P=9 | Q=10 TotalReturnSGD | R=11 TotalReturn%
+    var uTotalCost = num(uTotalsRow[0]), uTotalPL = num(uTotalsRow[3]), uTotalPLPct = num(uTotalsRow[4]) * 100,
+        uTotalDiv = num(uTotalsRow[6]), uTotalReturn = num(uTotalsRow[10]), uTotalReturnPct = num(uTotalsRow[11]) * 100;
 
-    data.stats.totalPositions = num(v("statTotalPositions"));
-    data.stats.largestPct = num(v("statLargestPct"));
-    data.stats.largestName = v("statLargestName") || data.stats.largestName;
-    data.stats.top5Pct = num(v("statTop5Pct"));
+    // ---- YoC Calc: per-holding TTM yields, row-aligned with Portfolio Overview
+    var yocRows = rows(r, "yocHoldings");
+    var yocByTicker = {};
+    yocRows.forEach(function (row) {
+      if (!str(row[0])) return;
+      yocByTicker[str(row[0])] = { yoc: num(row[7]) * 100, cur: num(row[8]) * 100 };
+    });
+    var yocTotalsCol = rows(r, "yocTotals").map(function (row) { return num(row[0]); });
+    var portfolioYoc = (yocTotalsCol[0] || 0) * 100, portfolioCurYield = (yocTotalsCol[1] || 0) * 100,
+        impliedAnnualDiv = yocTotalsCol[2] || 0, yocTotalMv = yocTotalsCol[3] || totalMv;
 
-    var holdingsRows = (r.holdingsTable && r.holdingsTable.values) || [];
-    if (holdingsRows.length) {
-      data.holdings = holdingsRows
-        .filter(function (row) { return row[1]; })
-        .map(function (row) {
-          return { name: row[1], tkr: row[2], mv: num(row[3]), glp: num(row[4]), gl: num(row[5]), div: num(row[6]) };
-        });
+    // ---- Merge holdings: name/ticker/weight from Portfolio Overview,
+    //      G/L + dividends from Unrealized P&L Dashboard (matched by company name),
+    //      yields from YoC Calc (matched by ticker) ------------------------
+    var holdings = poRows.map(function (h) {
+      var u = uByName[h.name] || { gl: 0, glp: 0, div: 0 };
+      return { name: h.name, tkr: h.tkr, mv: h.mv, gl: u.gl, glp: u.glp, div: u.div };
+    });
+    var totalCapGl = uTotalPL, totalDivRcvd = uTotalDiv;
+
+    // ---- Portfolio Overview summary block (Equity / Cash / Grand Total) --
+    // Range starts at row50 itself (the Equity row), not the header above it.
+    var poSummaryRows = rows(r, "poSummary"); // row0=Equity(50), row1=Cash(51), row2=blank(52), row3=GrandTotal(53)
+    var equityRow = poSummaryRows[0] || [], cashRow = poSummaryRows[1] || [];
+    var portfolioValue = num(equityRow[1]) || totalMv; // G=0(label) H=1(Value SGD)
+    var cashOnSide = num(cashRow[1]);
+
+    // ---- Asset mix / Geographic mix --------------------------------------
+    var catColors = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--ink-3)"];
+    var assetMix = rows(r, "poAssetMix")
+      .filter(function (row) { return str(row[0]); })
+      .map(function (row, i) { return { name: str(row[0]), value: num(row[2]), color: catColors[i % catColors.length] }; });
+    var geoMix = rows(r, "poGeoMix")
+      .filter(function (row) { return str(row[0]); })
+      .map(function (row) { return { name: regionName(str(row[0])), code: str(row[0]), value: num(row[1]) }; });
+    if (cashOnSide) geoMix.push({ name: "Cash", code: "Multi-ccy", value: cashOnSide });
+
+    // ---- Realised P&L Dashboard: closed positions ------------------------
+    var rRows = rows(r, "rHoldings")
+      .filter(function (row) { return str(row[0]); })
+      .map(function (row) {
+        return { name: str(row[0]), date: "Closed position", cap: num(row[8]), div: 0, total: num(row[8]) };
+      });
+    var realisedCap = num((rows(r, "rTotal")[0] || [])[0]) || rRows.reduce(function (a, x) { return a + x.cap; }, 0);
+
+    // ---- Dividend Dashboard: year-by-year, also gives lifetime total -----
+    var divYearRows = rows(r, "divYears").filter(function (row) { return str(row[0]) && row[9] !== null && row[9] !== ""; });
+    var lifetimeDiv = divYearRows.reduce(function (a, row) { return a + num(row[9]); }, 0);
+    var nowYear = new Date().getFullYear();
+    var years = divYearRows.slice(-6).map(function (row) {
+      return { y: str(row[0]), v: num(row[9]) };
+    });
+    for (var i = 0; i < years.length; i++) {
+      years[i].g = i > 0 && years[i - 1].v ? +(((years[i].v - years[i - 1].v) / years[i - 1].v) * 100).toFixed(2) : null;
+      if (parseInt(years[i].y, 10) === nowYear) { years[i].ytd = true; years[i].g = null; }
     }
 
-    var assetRows = (r.assetMixTable && r.assetMixTable.values) || [];
-    if (assetRows.length) {
-      var catColors = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--ink-3)"];
-      data.assetMix = assetRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row, i) {
-          return { name: row[0], value: num(row[2]), color: catColors[i % catColors.length] };
-        });
-    }
+    // Realised dividends collected = lifetime dividends minus dividends
+    // already attributed to still-open positions (Unrealized P&L Dashboard total).
+    var realisedDiv = Math.max(0, lifetimeDiv - totalDivRcvd);
+    var realisedTotal = realisedCap + realisedDiv;
 
-    var geoRows = (r.geoMixTable && r.geoMixTable.values) || [];
-    if (geoRows.length) {
-      data.geoMix = geoRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row) {
-          return { name: row[0], code: "", value: num(row[2]) };
-        });
-    }
+    // ---- Stats: largest holding, top-5 concentration, up/down counts -----
+    var byWeight = holdings.slice().sort(function (a, b) { return b.mv - a.mv; });
+    var largest = byWeight[0] || { name: "", mv: 0 };
+    var top5Mv = byWeight.slice(0, 5).reduce(function (a, h) { return a + h.mv; }, 0);
+    var posUp = holdings.filter(function (h) { return h.gl >= 0; }).length;
+    var posDown = holdings.length - posUp;
 
-    var capRows = (r.capitalTable && r.capitalTable.values) || [];
-    if (capRows.length) {
-      data.capitalMovers = capRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row) { return { name: row[0], tkr: row[1], gl: num(row[2]) }; });
+    // Growth KPI: today's annualised (TTM) dividend run-rate vs the most
+    // recently COMPLETED full calendar year's total (skip the YTD year).
+    var lastFullYear = years.length && years[years.length - 1].ytd ? years[years.length - 2] : years[years.length - 1];
+    var divIncomeAnnual = impliedAnnualDiv || totalDivRcvd;
+    data.kpi = {
+      portfolioValue: portfolioValue, holdingsCount: holdings.length, cashOnSide: cashOnSide,
+      unrealisedReturn: uTotalReturn, unrealisedReturnPct: uTotalReturnPct,
+      divIncomeAnnual: divIncomeAnnual,
+      divIncomeGrowthPct: lastFullYear ? pctChange(divIncomeAnnual, lastFullYear.v) : 0,
+      yieldCurrent: portfolioCurYield, yieldOnCost: portfolioYoc
+    };
+    data.stats = {
+      totalPositions: holdings.length,
+      largestPct: portfolioValue ? largest.mv / portfolioValue * 100 : 0,
+      largestName: largest.name,
+      top5Pct: portfolioValue ? top5Mv / portfolioValue * 100 : 0
+    };
+    // The "01 Holdings" bar list/table is titled "top 10" and the render
+    // code shows every entry it's given (no sorting/limiting of its own),
+    // so build that top-10-plus-rollup shape here — same pattern as the
+    // approved design (10 named holdings + one "Other N holdings" row).
+    var byMvDesc = holdings.slice().sort(function (a, b) { return b.mv - a.mv; });
+    var top10 = byMvDesc.slice(0, 10);
+    var rest = byMvDesc.slice(10);
+    if (rest.length) {
+      var restTotals = rest.reduce(function (a, h) { a.mv += h.mv; a.gl += h.gl; a.div += h.div; return a; }, { mv: 0, gl: 0, div: 0 });
+      var restCost = restTotals.mv - restTotals.gl;
+      top10.push({
+        name: "Other " + rest.length + " holdings", tkr: "—",
+        mv: restTotals.mv, gl: restTotals.gl,
+        glp: restCost ? restTotals.gl / restCost * 100 : 0,
+        div: restTotals.div
+      });
     }
-
-    var unrealRows = (r.unrealisedTable && r.unrealisedTable.values) || [];
-    if (unrealRows.length) {
-      data.unrealisedTotals = unrealRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row) { return { name: row[0], tkr: row[1], cap: num(row[2]), div: num(row[3]), total: num(row[4]) }; });
-    }
-
-    var realRows = (r.realisedTable && r.realisedTable.values) || [];
-    if (realRows.length) {
-      data.realisedTotals = realRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row) { return { name: row[0], date: "Closed position", cap: num(row[2]), div: num(row[3]), total: num(row[4]) }; });
-    }
-    data.realisedSummary.cap = num(v("realisedCap"));
-    data.realisedSummary.div = num(v("realisedDiv"));
-    data.realisedSummary.total = num(v("realisedTotal"));
-
-    var yearRows = (r.growthTable && r.growthTable.values) || [];
-    if (yearRows.length) {
-      var years = yearRows.filter(function (row) { return row[0]; }).map(function (row) { return { y: String(row[0]), v: num(row[1]) }; });
-      for (var i = 0; i < years.length; i++) {
-        years[i].g = i > 0 && years[i - 1].v ? +(((years[i].v - years[i - 1].v) / years[i - 1].v) * 100).toFixed(2) : null;
-      }
-      if (years.length) years[years.length - 1].ytd = new Date().getMonth() < 11;
-      data.years = years;
-    }
-
-    data.yieldSummary.yoc = num(v("yocPortfolio"));
-    data.yieldSummary.cur = num(v("curYieldPortfolio"));
-
-    var yieldRows = (r.yieldTable && r.yieldTable.values) || [];
-    if (yieldRows.length) {
-      data.yields = yieldRows
-        .filter(function (row) { return row[0]; })
-        .map(function (row) { return { name: row[0], yoc: num(row[1]), cur: num(row[2]) }; });
-    }
+    data.holdings = top10;
+    data.totalMv = totalMv; data.totalCapGl = totalCapGl; data.totalDivRcvd = totalDivRcvd;
+    data.assetMix = assetMix;
+    data.geoMix = geoMix;
+    data.capitalMovers = holdings.slice().sort(function (a, b) { return Math.abs(b.gl) - Math.abs(a.gl); }).slice(0, 9)
+      .map(function (h) { return { name: h.name, tkr: h.tkr, gl: h.gl }; });
+    data.capitalSummary = { gain: totalCapGl, gainPct: uTotalPLPct, up: posUp, down: posDown, of: holdings.length };
+    data.unrealisedTotals = holdings.map(function (h) { return { name: h.name, tkr: h.tkr, cap: h.gl, div: h.div, total: h.gl + h.div }; });
+    data.realisedTotals = rRows.slice().sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); }).slice(0, 10);
+    data.realisedSummary = { cap: realisedCap, div: realisedDiv, total: realisedTotal, count: rRows.length };
+    data.years = years;
+    data.yieldSummary = { yoc: portfolioYoc, cur: portfolioCurYield };
+    data.yields = holdings.map(function (h) {
+      var y = yocByTicker[h.tkr] || { yoc: 0, cur: 0 };
+      return { name: h.name, yoc: y.yoc, cur: y.cur };
+    }).filter(function (y) { return y.yoc || y.cur; })
+      .sort(function (a, b) { return b.yoc - a.yoc; }).slice(0, 9);
+    data.yields.push({ name: "Portfolio overall", yoc: portfolioYoc, cur: portfolioCurYield, hl: true });
 
     return data;
   }
+
+  function pctChange(current, previous) {
+    if (!previous) return 0;
+    return +(((current - previous) / previous) * 100).toFixed(1);
+  }
+
+  var REGION_NAMES = { SG: "Singapore", AU: "Australia", HK: "Hong Kong / China", EU: "Europe", UK: "United Kingdom", US: "United States", IN: "India", JP: "Japan" };
+  function regionName(code) { return REGION_NAMES[code] || code; }
 
   // ===========================================================================
   // 5. SAMPLE DATA BUILDER (fallback — mirrors the approved design template)
@@ -349,8 +447,8 @@
   //    matching the shape produced above (live or sample).
   // ===========================================================================
   var fmt = function (n) { return Math.round(Math.abs(n)).toLocaleString("en-SG"); };
-  var signed = function (n) { return (n >= 0 ? "+" : "\u2212") + fmt(n); };
-  var signedSgd = function (n) { return (n >= 0 ? "+S$" : "\u2212S$") + fmt(n); };
+  var signed = function (n) { return (n >= 0 ? "+" : "−") + fmt(n); };
+  var signedSgd = function (n) { return (n >= 0 ? "+S$" : "−S$") + fmt(n); };
 
   var tip = null;
   function showTip(e, html) {
@@ -377,3 +475,268 @@
     renderAssetMix(data);
     renderGeoMix(data);
     renderCapital(data);
+    renderUnrealised(data);
+    renderRealised(data);
+    renderGrowth(data);
+    renderYield(data);
+  }
+
+  function renderKpis(data) {
+    setText("kpi-portfolio-value", "S$" + fmt(data.kpi.portfolioValue));
+    setText("kpi-portfolio-sub", data.kpi.holdingsCount + " holdings · +S$" + fmt(data.kpi.cashOnSide) + " cash on the side");
+
+    var uEl = document.getElementById("kpi-unrealised");
+    if (uEl) { uEl.textContent = signedSgd(data.kpi.unrealisedReturn); uEl.classList.toggle("up", data.kpi.unrealisedReturn >= 0); uEl.classList.toggle("down", data.kpi.unrealisedReturn < 0); }
+    setText("kpi-unrealised-sub", (data.kpi.unrealisedReturnPct >= 0 ? "+" : "−") + Math.abs(data.kpi.unrealisedReturnPct) + "% on cost · capital + dividends since purchase");
+
+    setText("kpi-div-income", "S$" + fmt(data.kpi.divIncomeAnnual));
+    setText("kpi-div-sub", (data.kpi.divIncomeGrowthPct >= 0 ? "+" : "−") + Math.abs(data.kpi.divIncomeGrowthPct) + "% vs prior full year");
+
+    setText("kpi-yield", data.kpi.yieldCurrent.toFixed(1) + "% / " + data.kpi.yieldOnCost.toFixed(1) + "%");
+
+    setText("stat-total-positions", data.stats.totalPositions);
+    setText("stat-largest-pct", data.stats.largestPct.toFixed(1) + "%");
+    setText("stat-largest-name", data.stats.largestName);
+    setText("stat-top5", data.stats.top5Pct.toFixed(1) + "%");
+  }
+
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function renderHoldingsList(data) {
+    var el = document.getElementById("chart-holdings");
+    if (!el) return;
+    clear(el);
+    var max = Math.max.apply(null, data.holdings.map(function (h) { return h.mv; }));
+    data.holdings.forEach(function (h) {
+      var pct = (h.mv / data.totalMv * 100).toFixed(1);
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<div class="name">' + h.name + "<small>" + h.tkr + "</small></div>" +
+        '<div class="track"><div class="fill num" style="width:' + (h.mv / max * 100) + '%"></div></div>' +
+        '<div class="val num">S$' + fmt(h.mv) + "</div>";
+      var fillEl = row.querySelector(".fill");
+      fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + h.name + "</b>" + pct + "% of portfolio &middot; S$" + fmt(h.mv)); });
+      fillEl.addEventListener("mouseleave", hideTip);
+      el.appendChild(row);
+    });
+  }
+
+  function renderHoldingsTable(data) {
+    var t = document.getElementById("table-holdings");
+    if (!t) return;
+    var thead = "<thead><tr><th>Holding</th><th>Ticker</th><th>Market value</th><th>% Portfolio</th><th>Unrealised G/L</th></tr></thead>";
+    var rows = data.holdings.map(function (h) {
+      var pct = (h.mv / data.totalMv * 100).toFixed(1);
+      var cls = h.gl >= 0 ? "up" : "down";
+      return "<tr><td>" + h.name + '</td><td class="tkr">' + h.tkr + '</td><td class="num">S$' + fmt(h.mv) + '</td><td class="num">' + pct + '%</td>' +
+        '<td class="num ' + cls + '">' + signed(h.gl) + " (" + (h.glp >= 0 ? "+" : "−") + Math.abs(h.glp) + "%)</td></tr>";
+    }).join("");
+    var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num">S$' + fmt(data.totalMv) + '</td><td class="num">100%</td><td class="num up">' + signed(data.totalCapGl) + "</td></tr>";
+    t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
+  }
+
+  function renderAssetMix(data) {
+    var bar = document.getElementById("chart-assetmix");
+    var legend = document.getElementById("legend-assetmix");
+    if (!bar || !legend) return;
+    clear(bar); clear(legend);
+    var total = data.assetMix.reduce(function (a, d) { return a + d.value; }, 0);
+    data.assetMix.forEach(function (d) {
+      var pct = (d.value / total * 100);
+      var seg = document.createElement("div");
+      seg.className = "seg";
+      seg.style.width = pct + "%";
+      seg.style.background = d.color;
+      seg.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + pct.toFixed(1) + "% &middot; S$" + fmt(d.value)); });
+      seg.addEventListener("mouseleave", hideTip);
+      bar.appendChild(seg);
+
+      var li = document.createElement("li");
+      li.innerHTML = '<i style="background:' + d.color + '"></i><span class="lname">' + d.name + '</span><span class="lval num">' + pct.toFixed(1) + "% &middot; S$" + fmt(d.value) + "</span>";
+      legend.appendChild(li);
+    });
+  }
+
+  function renderGeoMix(data) {
+    var el = document.getElementById("chart-geomix");
+    if (!el) return;
+    clear(el);
+    var total = data.geoMix.reduce(function (a, d) { return a + d.value; }, 0);
+    var max = Math.max.apply(null, data.geoMix.map(function (d) { return d.value; }));
+    data.geoMix.slice().sort(function (a, b) { return b.value - a.value; }).forEach(function (d) {
+      var pct = (d.value / total * 100);
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<div class="name">' + d.name + "<small>" + d.code + "</small></div>" +
+        '<div class="track"><div class="fill num" style="width:' + (max ? d.value / max * 100 : 0) + '%; background:var(--accent);"></div></div>' +
+        '<div class="val num">' + (d.value ? pct.toFixed(1) + "%" : "—") + "</div>";
+      var fillEl = row.querySelector(".fill");
+      fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (d.value ? pct.toFixed(1) + "% · S$" + fmt(d.value) : "No current exposure")); });
+      fillEl.addEventListener("mouseleave", hideTip);
+      el.appendChild(row);
+    });
+  }
+
+  function renderDiverging(elId, list, valueFn, subFn) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    clear(el);
+    if (!list.length) return;
+    var max = Math.max.apply(null, list.map(function (d) { return Math.abs(valueFn(d)); }));
+    list.forEach(function (d) {
+      var v = valueFn(d);
+      var isGain = v >= 0;
+      var w = (max ? Math.abs(v) / max * 100 : 0) + "%";
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<div class="name">' + d.name + (subFn ? "<small>" + subFn(d) + "</small>" : "") + "</div>" +
+        '<div class="dtrack l">' + (!isGain ? '<div class="dfill loss num" style="width:' + w + '"></div>' : "") + "</div>" +
+        '<div class="axis"></div>' +
+        '<div class="dtrack r">' + (isGain ? '<div class="dfill gain num" style="width:' + w + '"></div>' : "") + "</div>" +
+        '<div class="val num ' + (isGain ? "up" : "down") + '">' + signed(v) + "</div>";
+      var fillEl = row.querySelector(".dfill");
+      if (fillEl) {
+        fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (isGain ? "Gain: " : "Loss: ") + signed(v)); });
+        fillEl.addEventListener("mouseleave", hideTip);
+      }
+      el.appendChild(row);
+    });
+  }
+
+  function renderCapital(data) {
+    setText("stat-cap-gain", signedSgd(data.capitalSummary.gain));
+    var el = document.getElementById("stat-cap-gain"); if (el) el.classList.add(data.capitalSummary.gain >= 0 ? "up" : "down");
+    setText("stat-cap-gain-pct", (data.capitalSummary.gainPct >= 0 ? "+" : "−") + Math.abs(data.capitalSummary.gainPct) + "% on cost");
+    setText("stat-pos-up", data.capitalSummary.up);
+    setText("stat-pos-up-of", "of " + data.capitalSummary.of + " holdings");
+    setText("stat-pos-down", data.capitalSummary.down);
+    setText("stat-pos-down-of", "of " + data.capitalSummary.of + " holdings");
+
+    renderDiverging("chart-capital", data.capitalMovers, function (h) { return h.gl; }, function (h) { return h.tkr; });
+  }
+
+  function renderUnrealised(data) {
+    setText("stat-u-cap", signedSgd(data.totalCapGl));
+    setText("stat-u-div", "+S$" + fmt(data.totalDivRcvd));
+    var total = data.totalCapGl + data.totalDivRcvd;
+    setText("stat-u-total", signedSgd(total));
+    setText("stat-u-total-pct", (data.kpi.unrealisedReturnPct >= 0 ? "+" : "−") + Math.abs(data.kpi.unrealisedReturnPct) + "% on cost · since each position was purchased");
+
+    var top10 = data.unrealisedTotals.slice().sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); }).slice(0, 10);
+    renderDiverging("chart-unrealised", top10, function (h) { return h.total; }, function (h) { return h.tkr; });
+
+    var t = document.getElementById("table-unrealised");
+    if (t) {
+      var thead = "<thead><tr><th>Holding</th><th>Ticker</th><th>Capital G/L</th><th>Dividends</th><th>Total return</th></tr></thead>";
+      var rows = data.unrealisedTotals.map(function (h) {
+        return "<tr><td>" + h.name + '</td><td class="tkr">' + h.tkr + '</td>' +
+          '<td class="num ' + (h.cap >= 0 ? "up" : "down") + '">' + signed(h.cap) + "</td>" +
+          '<td class="num" style="color:var(--div);">+S$' + fmt(h.div) + "</td>" +
+          '<td class="num ' + (h.total >= 0 ? "up" : "down") + '">' + signed(h.total) + "</td></tr>";
+      }).join("");
+      var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num up">' + signed(data.totalCapGl) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.totalDivRcvd) + '</td><td class="num up">' + signed(total) + "</td></tr>";
+      t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
+    }
+  }
+
+  function renderRealised(data) {
+    setText("stat-r-cap", signedSgd(data.realisedSummary.cap));
+    setText("stat-r-div", "+S$" + fmt(data.realisedSummary.div));
+    setText("stat-r-total", signedSgd(data.realisedSummary.total));
+
+    renderDiverging("chart-realised", data.realisedTotals, function (r) { return r.total; }, function (r) { return r.date; });
+
+    var t = document.getElementById("table-realised");
+    if (t) {
+      var thead = "<thead><tr><th>Holding</th><th>Closed</th><th>Capital G/L</th><th>Dividends</th><th>Total return</th></tr></thead>";
+      var rows = data.realisedTotals.map(function (r) {
+        return "<tr><td>" + r.name + '</td><td class="tkr">' + r.date.replace("Closed ", "") + '</td>' +
+          '<td class="num ' + (r.cap >= 0 ? "up" : "down") + '">' + signed(r.cap) + "</td>" +
+          '<td class="num" style="color:var(--div);">+S$' + fmt(r.div) + "</td>" +
+          '<td class="num ' + (r.total >= 0 ? "up" : "down") + '">' + signed(r.total) + "</td></tr>";
+      }).join("");
+      var totalRow = '<tr class="total"><td>All closed positions</td><td></td><td class="num up">' + signed(data.realisedSummary.cap) + '</td><td class="num" style="color:var(--div);">+S$' + fmt(data.realisedSummary.div) + '</td><td class="num up">' + signed(data.realisedSummary.total) + "</td></tr>";
+      t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
+    }
+  }
+
+  function renderGrowth(data) {
+    var years = data.years;
+    if (years.length >= 2) {
+      var first = years[0], last = years[years.length - (years[years.length - 1].ytd ? 2 : 1)];
+      var n = years.filter(function (y) { return !y.ytd; }).length - 1;
+      var cagr = n > 0 && first.v ? (Math.pow(last.v / first.v, 1 / n) - 1) * 100 : 0;
+      setText("cagr-label", n + "-year CAGR (" + first.y + "–" + last.y + ")");
+      setText("stat-cagr", (cagr >= 0 ? "+" : "−") + Math.abs(cagr).toFixed(1) + "%");
+    }
+    var ytdYear = years[years.length - 1];
+    if (ytdYear && ytdYear.ytd) {
+      setText("ytd-label", ytdYear.y + " so far");
+      setText("stat-ytd", "S$" + fmt(ytdYear.v));
+      var prior = years[years.length - 2];
+      setText("stat-ytd-sub", prior ? "through this year · full-year " + prior.y + " was S$" + fmt(prior.v) : "year to date");
+    } else {
+      setText("ytd-label", "Latest year");
+      setText("stat-ytd", ytdYear ? "S$" + fmt(ytdYear.v) : "—");
+    }
+
+    var el = document.getElementById("chart-growth");
+    if (!el) return;
+    clear(el);
+    var max = Math.max.apply(null, years.map(function (y) { return y.v; }));
+    years.forEach(function (y) {
+      var h = (y.v / max * 160);
+      var col = document.createElement("div");
+      col.className = "yr";
+      col.innerHTML =
+        (y.g ? '<div class="yr-growth">+' + y.g + "%</div>" : (y.ytd ? '<div class="yr-growth" style="color:var(--ink-3);">YTD</div>' : '<div class="yr-growth">&nbsp;</div>')) +
+        '<div class="yr-val num">S$' + fmt(y.v) + "</div>" +
+        '<div class="yr-bar num' + (y.ytd ? " ytd" : "") + '" style="height:' + h + 'px"></div>' +
+        '<div class="yr-label">' + y.y + (y.ytd ? "<small>year to date</small>" : "") + "</div>";
+      var bar = col.querySelector(".yr-bar");
+      bar.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.y + (y.ytd ? " (year to date)" : "") + "</b>S$" + fmt(y.v) + (y.g ? " &middot; +" + y.g + "% vs prior year" : "")); });
+      bar.addEventListener("mouseleave", hideTip);
+      el.appendChild(col);
+    });
+  }
+
+  function renderYield(data) {
+    setText("stat-yoc", data.yieldSummary.yoc.toFixed(1) + "%");
+    setText("stat-cur-yield", data.yieldSummary.cur.toFixed(1) + "%");
+    var spread = data.yieldSummary.yoc - data.yieldSummary.cur;
+    var spreadEl = document.getElementById("stat-spread");
+    if (spreadEl) { spreadEl.textContent = (spread >= 0 ? "+" : "−") + Math.abs(spread).toFixed(1) + "pp"; spreadEl.classList.toggle("up", spread >= 0); spreadEl.classList.toggle("down", spread < 0); }
+    setText("stat-spread-sub", spread >= 0 ? "on cost still beats current — a positive spread across holdings" : "current yield now beats yield on cost");
+
+    var el = document.getElementById("chart-yield");
+    if (!el) return;
+    clear(el);
+    var max = 12; // scale 0-12%
+    data.yields.forEach(function (y) {
+      var row = document.createElement("div");
+      row.className = "row" + (y.hl ? " highlight" : "");
+      var p1 = (y.yoc / max * 100), p2 = (y.cur / max * 100);
+      var lo = Math.min(p1, p2), hi = Math.max(p1, p2);
+      row.innerHTML =
+        '<div class="name">' + y.name + (y.note ? ' <span title="' + y.note + '" style="color:var(--ink-3); font-weight:400; font-size:11px; cursor:help;">&nbsp;(' + y.note + ')</span>' : "") + "</div>" +
+        '<div class="dtrack2">' +
+        '<div class="dline" style="left:' + lo + '%; width:' + (hi - lo) + '%;"></div>' +
+        '<div class="dot cost" style="left:calc(' + p1 + '% - 6px)"></div>' +
+        '<div class="dot cur" style="left:calc(' + p2 + '% - 6px)"></div>' +
+        "</div>" +
+        '<div class="dumb-vals num">' + y.yoc.toFixed(1) + "% <b>/</b> " + y.cur.toFixed(1) + "%</div>";
+      var costDot = row.querySelector(".dot.cost"), curDot = row.querySelector(".dot.cur");
+      costDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Yield on cost: " + y.yoc.toFixed(1) + "%"); });
+      costDot.addEventListener("mouseleave", hideTip);
+      curDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Current yield: " + y.cur.toFixed(1) + "%"); });
+      curDot.addEventListener("mouseleave", hideTip);
+      el.appendChild(row);
+    });
+  }
+})();
