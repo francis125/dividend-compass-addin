@@ -364,7 +364,7 @@
 
   function pctChange(current, previous) {
     if (!previous) return 0;
-    return +(((current - previous) / previous) * 100).toFixed(1);
+    return +(((current - previous) / previous) * 100).toFixed(2);
   }
 
   var REGION_NAMES = { SG: "Singapore", AU: "Australia", HK: "Hong Kong / China", EU: "Europe", UK: "United Kingdom", US: "United States", IN: "India", JP: "Japan" };
@@ -478,6 +478,9 @@
   var fmt = function (n) { return Math.round(Math.abs(n)).toLocaleString("en-SG"); };
   var signed = function (n) { return (n >= 0 ? "+" : "−") + fmt(n); };
   var signedSgd = function (n) { return (n >= 0 ? "+S$" : "−S$") + fmt(n); };
+  // Every percentage on the dashboard is shown to exactly 2 decimal places.
+  var pct2 = function (n) { return (n || 0).toFixed(2); };
+  var signedPct2 = function (n) { return (n >= 0 ? "+" : "−") + pct2(Math.abs(n)); };
 
   var tip = null;
   function showTip(e, html) {
@@ -516,17 +519,17 @@
 
     var uEl = document.getElementById("kpi-unrealised");
     if (uEl) { uEl.textContent = signedSgd(data.kpi.unrealisedReturn); uEl.classList.toggle("up", data.kpi.unrealisedReturn >= 0); uEl.classList.toggle("down", data.kpi.unrealisedReturn < 0); }
-    setText("kpi-unrealised-sub", (data.kpi.unrealisedReturnPct >= 0 ? "+" : "−") + Math.abs(data.kpi.unrealisedReturnPct) + "% on cost · capital + dividends since purchase");
+    setText("kpi-unrealised-sub", signedPct2(data.kpi.unrealisedReturnPct) + "% on cost · capital + dividends since purchase");
 
     setText("kpi-div-income", "S$" + fmt(data.kpi.divIncomeAnnual));
-    setText("kpi-div-sub", (data.kpi.divIncomeGrowthPct >= 0 ? "+" : "−") + Math.abs(data.kpi.divIncomeGrowthPct) + "% vs prior full year");
+    setText("kpi-div-sub", signedPct2(data.kpi.divIncomeGrowthPct) + "% vs prior full year");
 
-    setText("kpi-yield", data.kpi.yieldCurrent.toFixed(1) + "% / " + data.kpi.yieldOnCost.toFixed(1) + "%");
+    setText("kpi-yield", pct2(data.kpi.yieldCurrent) + "% / " + pct2(data.kpi.yieldOnCost) + "%");
 
     setText("stat-total-positions", data.stats.totalPositions);
-    setText("stat-largest-pct", data.stats.largestPct.toFixed(1) + "%");
+    setText("stat-largest-pct", pct2(data.stats.largestPct) + "%");
     setText("stat-largest-name", data.stats.largestName);
-    setText("stat-top5", data.stats.top5Pct.toFixed(1) + "%");
+    setText("stat-top5", pct2(data.stats.top5Pct) + "%");
   }
 
   function setText(id, text) {
@@ -540,7 +543,7 @@
     clear(el);
     var max = Math.max.apply(null, data.holdings.map(function (h) { return h.mv; }));
     data.holdings.forEach(function (h) {
-      var pct = (h.mv / data.totalMv * 100).toFixed(1);
+      var pct = pct2(h.mv / data.totalMv * 100);
       var row = document.createElement("div");
       row.className = "row";
       row.innerHTML =
@@ -559,10 +562,10 @@
     if (!t) return;
     var thead = "<thead><tr><th>Holding</th><th>Ticker</th><th>Market value</th><th>% Portfolio</th><th>Unrealised G/L</th></tr></thead>";
     var rows = data.holdings.map(function (h) {
-      var pct = (h.mv / data.totalMv * 100).toFixed(1);
+      var pct = pct2(h.mv / data.totalMv * 100);
       var cls = h.gl >= 0 ? "up" : "down";
       return "<tr><td>" + h.name + '</td><td class="tkr">' + h.tkr + '</td><td class="num">S$' + fmt(h.mv) + '</td><td class="num">' + pct + '%</td>' +
-        '<td class="num ' + cls + '">' + signed(h.gl) + " (" + (h.glp >= 0 ? "+" : "−") + Math.abs(h.glp) + "%)</td></tr>";
+        '<td class="num ' + cls + '">' + signed(h.gl) + " (" + signedPct2(h.glp) + "%)</td></tr>";
     }).join("");
     var totalRow = '<tr class="total"><td>Total</td><td></td><td class="num">S$' + fmt(data.totalMv) + '</td><td class="num">100%</td><td class="num up">' + signed(data.totalCapGl) + "</td></tr>";
     t.innerHTML = thead + "<tbody>" + rows + totalRow + "</tbody>";
@@ -580,12 +583,12 @@
       seg.className = "seg";
       seg.style.width = pct + "%";
       seg.style.background = d.color;
-      seg.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + pct.toFixed(1) + "% &middot; S$" + fmt(d.value)); });
+      seg.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + pct2(pct) + "% &middot; S$" + fmt(d.value)); });
       seg.addEventListener("mouseleave", hideTip);
       bar.appendChild(seg);
 
       var li = document.createElement("li");
-      li.innerHTML = '<i style="background:' + d.color + '"></i><span class="lname">' + d.name + '</span><span class="lval num">' + pct.toFixed(1) + "% &middot; S$" + fmt(d.value) + "</span>";
+      li.innerHTML = '<i style="background:' + d.color + '"></i><span class="lname">' + d.name + '</span><span class="lval num">' + pct2(pct) + "% &middot; S$" + fmt(d.value) + "</span>";
       legend.appendChild(li);
     });
   }
@@ -603,9 +606,9 @@
       row.innerHTML =
         '<div class="name">' + d.name + "<small>" + d.code + "</small></div>" +
         '<div class="track"><div class="fill num" style="width:' + (max ? d.value / max * 100 : 0) + '%; background:var(--accent);"></div></div>' +
-        '<div class="val num">' + (d.value ? pct.toFixed(1) + "%" : "—") + "</div>";
+        '<div class="val num">' + (d.value ? pct2(pct) + "%" : "—") + "</div>";
       var fillEl = row.querySelector(".fill");
-      fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (d.value ? pct.toFixed(1) + "% · S$" + fmt(d.value) : "No current exposure")); });
+      fillEl.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + d.name + "</b>" + (d.value ? pct2(pct) + "% · S$" + fmt(d.value) : "No current exposure")); });
       fillEl.addEventListener("mouseleave", hideTip);
       el.appendChild(row);
     });
@@ -641,7 +644,7 @@
   function renderCapital(data) {
     setText("stat-cap-gain", signedSgd(data.capitalSummary.gain));
     var el = document.getElementById("stat-cap-gain"); if (el) el.classList.add(data.capitalSummary.gain >= 0 ? "up" : "down");
-    setText("stat-cap-gain-pct", (data.capitalSummary.gainPct >= 0 ? "+" : "−") + Math.abs(data.capitalSummary.gainPct) + "% on cost");
+    setText("stat-cap-gain-pct", signedPct2(data.capitalSummary.gainPct) + "% on cost");
     setText("stat-pos-up", data.capitalSummary.up);
     setText("stat-pos-up-of", "of " + data.capitalSummary.of + " holdings");
     setText("stat-pos-down", data.capitalSummary.down);
@@ -655,7 +658,7 @@
     setText("stat-u-div", "+S$" + fmt(data.totalDivRcvd));
     var total = data.totalCapGl + data.totalDivRcvd;
     setText("stat-u-total", signedSgd(total));
-    setText("stat-u-total-pct", (data.kpi.unrealisedReturnPct >= 0 ? "+" : "−") + Math.abs(data.kpi.unrealisedReturnPct) + "% on cost · since each position was purchased");
+    setText("stat-u-total-pct", signedPct2(data.kpi.unrealisedReturnPct) + "% on cost · since each position was purchased");
 
     var top10 = data.unrealisedTotals.slice().sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); }).slice(0, 10);
     renderDiverging("chart-unrealised", top10, function (h) { return h.total; }, function (h) { return h.tkr; });
@@ -702,7 +705,7 @@
       var n = years.filter(function (y) { return !y.ytd; }).length - 1;
       var cagr = n > 0 && first.v ? (Math.pow(last.v / first.v, 1 / n) - 1) * 100 : 0;
       setText("cagr-label", n + "-year CAGR (" + first.y + "–" + last.y + ")");
-      setText("stat-cagr", (cagr >= 0 ? "+" : "−") + Math.abs(cagr).toFixed(1) + "%");
+      setText("stat-cagr", signedPct2(cagr) + "%");
     }
     var ytdYear = years[years.length - 1];
     if (ytdYear && ytdYear.ytd) {
@@ -736,11 +739,11 @@
   }
 
   function renderYield(data) {
-    setText("stat-yoc", data.yieldSummary.yoc.toFixed(1) + "%");
-    setText("stat-cur-yield", data.yieldSummary.cur.toFixed(1) + "%");
+    setText("stat-yoc", pct2(data.yieldSummary.yoc) + "%");
+    setText("stat-cur-yield", pct2(data.yieldSummary.cur) + "%");
     var spread = data.yieldSummary.yoc - data.yieldSummary.cur;
     var spreadEl = document.getElementById("stat-spread");
-    if (spreadEl) { spreadEl.textContent = (spread >= 0 ? "+" : "−") + Math.abs(spread).toFixed(1) + "pp"; spreadEl.classList.toggle("up", spread >= 0); spreadEl.classList.toggle("down", spread < 0); }
+    if (spreadEl) { spreadEl.textContent = (spread >= 0 ? "+" : "−") + pct2(Math.abs(spread)) + "pp"; spreadEl.classList.toggle("up", spread >= 0); spreadEl.classList.toggle("down", spread < 0); }
     setText("stat-spread-sub", spread >= 0 ? "on cost still beats current — a positive spread across holdings" : "current yield now beats yield on cost");
 
     var el = document.getElementById("chart-yield");
@@ -759,11 +762,11 @@
         '<div class="dot cost" style="left:calc(' + p1 + '% - 6px)"></div>' +
         '<div class="dot cur" style="left:calc(' + p2 + '% - 6px)"></div>' +
         "</div>" +
-        '<div class="dumb-vals num">' + y.yoc.toFixed(1) + "% <b>/</b> " + y.cur.toFixed(1) + "%</div>";
+        '<div class="dumb-vals num">' + pct2(y.yoc) + "% <b>/</b> " + pct2(y.cur) + "%</div>";
       var costDot = row.querySelector(".dot.cost"), curDot = row.querySelector(".dot.cur");
-      costDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Yield on cost: " + y.yoc.toFixed(1) + "%"); });
+      costDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Yield on cost: " + pct2(y.yoc) + "%"); });
       costDot.addEventListener("mouseleave", hideTip);
-      curDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Current yield: " + y.cur.toFixed(1) + "%"); });
+      curDot.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + y.name + "</b>Current yield: " + pct2(y.cur) + "%"); });
       curDot.addEventListener("mouseleave", hideTip);
       el.appendChild(row);
     });
