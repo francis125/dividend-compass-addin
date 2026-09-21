@@ -119,10 +119,21 @@ main{ padding-bottom:64px; }
 /* ---------- sections ---------- */
 section.block{
   padding-block:34px; border-top:1px solid var(--border);
-  /* Same GPU-layer promotion as .topbar — gives each section its own
-     paint layer so it repaints cleanly instead of showing stale content
-     from a section scrolled past it. */
+  /* Content visible in the first screen (hero + Holdings + Geographic
+     mix) renders fine; everything that only comes into view by
+     scrolling (Capital Gain/Loss onward) does not — the WebView isn't
+     repainting sections as they scroll into view, so stale/adjacent
+     content bleeds through. CSS containment tells the engine each
+     section's layout and paint are fully self-contained, so scrolling
+     one into view can't reuse or skip a repaint meant for another —
+     this is the purpose-built fix for exactly this failure mode.
+     transform + will-change + backface-visibility force it onto its
+     own persistent compositing layer as a belt-and-braces measure for
+     older WebKit/WebView engines that honor `contain` inconsistently. */
+  contain:content;
   transform:translateZ(0);
+  will-change:transform;
+  backface-visibility:hidden;
 }
 .sec-head{ margin-bottom:20px; }
 .sec-head h2{ font-size:22px; font-weight:600; }
@@ -150,19 +161,26 @@ section.block{
 .fill{ position:absolute; top:0; left:0; height:100%; border-radius:5px; background:var(--accent); cursor:pointer; }
 .barlist .val{ font-size:12.5px; text-align:right; font-weight:600; }
 
-/* ---------- diverging chart ---------- */
+/* ---------- diverging chart ----------
+   Rebuilt to match the same single-1fr-track-plus-absolute-fill pattern
+   used by .barlist/.dumblist/.geolist (all of which render correctly).
+   The previous version used a 5-column grid with TWO separate 1fr
+   tracks either side of a 2px zero-gap divider — a double-fractional-
+   track grid shape none of the other (working) charts use — which is
+   exactly the kind of grid layout older WebKit/WebView engines have
+   historically mishandled. A single relative track with the fill bar
+   and center axis both absolutely positioned avoids that shape
+   entirely while looking identical. */
 .divlist{ display:flex; flex-direction:column; gap:12px; }
-.divlist .row{ display:grid; grid-template-columns:150px 1fr 2px 1fr 82px; align-items:center; gap:0; }
+.divlist .row{ display:grid; grid-template-columns:150px 1fr 82px; align-items:center; gap:10px; }
 .divlist .name{ font-size:12.5px; font-weight:600; padding-right:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .divlist .name small{ display:block; font-weight:400; color:var(--ink-3); font-size:11px; }
 .dtrack{ position:relative; height:14px; }
-.dtrack.l{ display:flex; justify-content:flex-end; }
-.dtrack.r{ display:flex; justify-content:flex-start; }
-.dfill{ height:100%; border-radius:4px; cursor:pointer; }
+.dtrack .axis{ position:absolute; left:50%; top:0; width:2px; height:100%; margin-left:-1px; background:var(--border); }
+.dtrack .dfill{ position:absolute; top:0; height:100%; border-radius:4px; cursor:pointer; }
 .dfill.loss{ background:var(--loss); }
 .dfill.gain{ background:var(--gain); }
-.axis{ height:100%; background:var(--border); }
-.divlist .val{ font-size:12.5px; text-align:right; font-weight:700; padding-left:10px; white-space:nowrap; }
+.divlist .val{ font-size:12.5px; text-align:right; font-weight:700; white-space:nowrap; }
 
 /* ---------- tooltip ---------- */
 #tip{
@@ -242,7 +260,7 @@ footer strong{ color:var(--ink-2); }
   .hero-grid{ grid-template-columns:1fr 1fr; }
   .stat-row{ grid-template-columns:1fr 1fr; }
   .barlist .row{ grid-template-columns:104px 1fr 62px; gap:8px; }
-  .divlist .row{ grid-template-columns:104px 1fr 2px 1fr 62px; }
+  .divlist .row{ grid-template-columns:104px 1fr 62px; gap:8px; }
   .dumblist .row{ grid-template-columns:104px 1fr 104px; gap:8px; }
   .brand-text p{ display:none; }
 }
