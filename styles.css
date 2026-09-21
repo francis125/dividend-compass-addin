@@ -242,10 +242,10 @@ tbody tr.total td{ font-weight:700; border-top:2px solid var(--border); border-b
 .stackbar .seg{ height:100%; cursor:pointer; position:relative; }
 .stackbar .seg + .seg{ border-left:2px solid var(--surface); }
 .legend-list{ list-style:none; margin:16px 0 0; padding:0; display:flex; flex-direction:column; gap:9px; }
-.legend-list li{ display:flex; align-items:center; gap:9px; font-size:12.5px; }
+.legend-list li{ display:grid; grid-template-columns:10px minmax(80px,120px) auto; align-items:center; column-gap:10px; font-size:12.5px; }
 .legend-list i{ width:10px; height:10px; border-radius:3px; flex:none; }
-.legend-list .lname{ flex:1; font-weight:600; }
-.legend-list .lval{ color:var(--ink-2); font-size:12px; }
+.legend-list .lname{ font-weight:600; }
+.legend-list .lval{ color:var(--ink-2); font-size:12px; text-align:left; }
 .geolist{ display:flex; flex-direction:column; gap:9px; }
 .geolist .row{ display:grid; grid-template-columns:92px 1fr 56px; align-items:center; gap:10px; }
 .geolist .name{ font-size:12.5px; font-weight:600; }
