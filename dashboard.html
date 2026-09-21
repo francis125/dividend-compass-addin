@@ -1,112 +1,224 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dividend Compass</title>
-    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <link rel="stylesheet" href="styles.css?v=2.2">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Dividend Compass</title>
+
+<!-- Office JS -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header Section -->
-        <div class="header-section">
-            <div class="header-top">
-                <div class="logo-title-group">
-                    <div class="dc-badge">DC</div>
-                    <div class="title-block">
-                        <h1>Portfolio Dashboard</h1>
-                        <p>Holdings · gains · dividends · yield, in one view</p>
-                    </div>
-                </div>
-                <div class="status-badge">
-                    <span class="status-dot"></span> Live · from your workbook
-                </div>
-            </div>
-            <div class="pulled-text" id="lastPulled">Pulled 18 Sept 2026</div>
 
-            <!-- Navigation Tabs -->
-            <div class="tab-nav">
-                <button class="tab-btn active" data-tab="tab-holdings">01 Holdings</button>
-                <button class="tab-btn" data-tab="tab-capital">02 Capital gain/loss</button>
-                <button class="tab-btn" data-tab="tab-unrealised">03 Unrealised P&L</button>
-                <button class="tab-btn" data-tab="tab-realised">04 Realised P&L</button>
-                <button class="tab-btn" data-tab="tab-dividend">05 Dividend gr...</button>
-            </div>
-        </div>
-
-        <!-- Tab Content Area -->
-        <div id="tab-holdings" class="tab-content active">
-            <!-- Top Summary Cards Grid -->
-            <div class="grid-2col">
-                <div class="card">
-                    <div class="card-label">PORTFOLIO VALUE</div>
-                    <div class="card-metric" id="kpiPortfolioValue">S$5,271,425</div>
-                    <div class="card-sub" id="kpiHoldingsCount">26 holdings · +S$599,856 cash on the side</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">UNREALISED RETURN</div>
-                    <div class="card-metric green">+S$1,215,647</div>
-                    <div class="card-sub">+24.8% on cost · capital + dividends since purchase</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">DIVIDEND INCOME, ANNUALISED</div>
-                    <div class="card-metric">S$248,661</div>
-                    <div class="card-sub">+17.8% vs full-year 2025</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">YIELD, CURRENT / ON COST</div>
-                    <div class="card-metric">4.4% <span class="sub-val">/ 4.7%</span></div>
-                    <div class="card-sub">trailing 12 months, on today's value / on what you paid</div>
-                </div>
-            </div>
-
-            <!-- Section 01: My Holdings -->
-            <div class="section-block">
-                <div class="section-header">
-                    <span class="section-num">01</span>
-                    <div>
-                        <h2>My Holdings</h2>
-                        <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
-                    </div>
-                </div>
-
-                <div class="grid-3col">
-                    <div class="card sub-card">
-                        <div class="card-label">TOTAL POSITIONS</div>
-                        <div class="card-metric-sm">26</div>
-                    </div>
-                    <div class="card sub-card">
-                        <div class="card-label">LARGEST HOLDING</div>
-                        <div class="card-metric-sm">18.3%</div>
-                        <div class="card-sub-name">Vanguard Australian Shares High Yield ETF</div>
-                    </div>
-                    <div class="card sub-card">
-                        <div class="card-label">TOP 5 CONCENTRATION</div>
-                        <div class="card-metric-sm">49.5%</div>
-                        <div class="card-sub">of portfolio value</div>
-                    </div>
-                </div>
-
-                <!-- Market Value Bars -->
-                <div class="card bar-card">
-                    <div class="bar-title">Market value by holding — top 10</div>
-                    <div class="bar-subtitle">in home currency (SGD)</div>
-                    
-                    <div id="top10HoldingsBars" class="bars-container">
-                        <!-- Dynamically populated rows from app.js will stream in here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-capital" class="tab-content">
-            <!-- 02 Content placeholder -->
-        </div>
-        <div id="tab-unrealised" class="tab-content"></div>
-        <div id="tab-realised" class="tab-content"></div>
-        <div id="tab-dividend" class="tab-content"></div>
+<div class="wrap topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">DC</div>
+      <div class="brand-text">
+        <h1>Portfolio Dashboard</h1>
+        <p>Holdings · gains · dividends · yield, in one view</p>
+      </div>
     </div>
-    <script src="app.js"></script>
+    <div class="meta">
+      <span class="sample-badge live" id="status-badge">Live · from your workbook</span>
+      <span class="updated" id="updated-label"></span>
+    </div>
+  </div>
+  <div class="subnav">
+    <a href="#holdings">Holdings</a>
+    <a href="#capital">Capital gain/loss</a>
+    <a href="#unrealised">Unrealised P&amp;L</a>
+    <a href="#realised">Realised P&amp;L</a>
+    <a href="#growth">Dividend growth</a>
+    <a href="#yield">Yield</a>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="hero-grid">
+      <div class="kpi">
+        <div class="kpi-label">Portfolio value</div>
+        <div class="kpi-value num" id="kpi-portfolio-value">—</div>
+        <div class="kpi-sub" id="kpi-portfolio-sub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Unrealised return</div>
+        <div class="kpi-value num" id="kpi-unrealised">—</div>
+        <div class="kpi-sub" id="kpi-unrealised-sub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Dividend income, annualised</div>
+        <div class="kpi-value num" id="kpi-div-income">—</div>
+        <div class="kpi-sub up" id="kpi-div-sub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Yield, current / on cost</div>
+        <div class="kpi-value num" id="kpi-yield">—</div>
+        <div class="kpi-sub">trailing 12 months, on today's value / on what you paid</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 HOLDINGS -->
+  <section class="block" id="holdings">
+    <div class="sec-head">
+        <h2>My Holdings</h2>
+        <p>Everything you currently own, and how much of your portfolio each position makes up.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Total positions</div><div class="stat-value num" id="stat-total-positions">—</div></div>
+      <div class="stat"><div class="stat-label">Largest holding</div><div class="stat-value num" id="stat-largest-pct">—</div><div class="stat-sub" id="stat-largest-name">—</div></div>
+      <div class="stat"><div class="stat-label">Top 5 concentration</div><div class="stat-value num" id="stat-top5">—</div><div class="stat-sub">of portfolio value</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Market value by holding — top 10</div>
+      <div class="card-note">in home currency (SGD)</div>
+      <div class="barlist" id="chart-holdings"></div>
+      <div class="tbl-wrap">
+        <table id="table-holdings"></table>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:14px;">
+      <div class="card card-pad">
+        <div class="card-title">Asset mix</div>
+        <div class="card-note">by instrument type, from Portfolio Overview</div>
+        <div class="stackbar" id="chart-assetmix"></div>
+        <ul class="legend-list" id="legend-assetmix"></ul>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">Geographic mix</div>
+        <div class="card-note">equity exposure by region; cash held as one lump sum</div>
+        <div class="geolist" id="chart-geomix"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 CAPITAL GAIN/LOSS -->
+  <section class="block" id="capital">
+    <div class="sec-head">
+        <h2>Capital Gain / Loss</h2>
+        <p>How much the price of what you own has moved, before any dividends — the paper gain or loss if you sold today.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Total capital gain</div><div class="stat-value num" id="stat-cap-gain">—</div><div class="stat-sub" id="stat-cap-gain-pct">—</div></div>
+      <div class="stat"><div class="stat-label">Positions up</div><div class="stat-value num" id="stat-pos-up">—</div><div class="stat-sub" id="stat-pos-up-of">—</div></div>
+      <div class="stat"><div class="stat-label">Positions down</div><div class="stat-value num" id="stat-pos-down">—</div><div class="stat-sub" id="stat-pos-down-of">—</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Unrealised capital gain / loss — top movers</div>
+      <div class="card-note">in home currency (SGD), sorted by size of movement</div>
+      <div class="divlist" id="chart-capital"></div>
+    </div>
+  </section>
+
+  <!-- 03 UNREALISED P&L -->
+  <section class="block" id="unrealised">
+    <div class="sec-head">
+        <h2>Unrealised P&amp;L with Dividend</h2>
+        <p>Your full return on current holdings: price movement plus dividends received, added together.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Capital gain/loss</div><div class="stat-value num" id="stat-u-cap">—</div></div>
+      <div class="stat"><div class="stat-label">Dividends received</div><div class="stat-value num" style="color:var(--div);" id="stat-u-div">—</div></div>
+      <div class="stat"><div class="stat-label">Total return</div><div class="stat-value num" id="stat-u-total">—</div><div class="stat-sub" id="stat-u-total-pct">—</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Total unrealised return by holding — top 10</div>
+      <div class="card-note">capital gain/loss + dividends received, combined</div>
+      <div class="divlist" id="chart-unrealised"></div>
+      <div class="tbl-wrap">
+        <table id="table-unrealised"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 REALISED P&L -->
+  <section class="block" id="realised">
+    <div class="sec-head">
+        <h2>Realised P&amp;L with Dividend</h2>
+        <p>The final result on positions you've already sold, including every dividend collected while you held them.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Realised capital gain/loss</div><div class="stat-value num" id="stat-r-cap">—</div></div>
+      <div class="stat"><div class="stat-label">Dividends collected</div><div class="stat-value num" style="color:var(--div);" id="stat-r-div">—</div></div>
+      <div class="stat"><div class="stat-label">Total realised return</div><div class="stat-value num" id="stat-r-total">—</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Closed positions — total return, top 10 by size</div>
+      <div class="card-note" id="realised-note">closed positions to date, across the portfolio's history</div>
+      <div class="divlist" id="chart-realised"></div>
+      <div class="tbl-wrap">
+        <table id="table-realised"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 DIVIDEND GROWTH -->
+  <section class="block" id="growth">
+    <div class="sec-head">
+        <h2>Dividend Growth, Year on Year</h2>
+        <p>How your dividend income has grown each year — the engine of a long-term income portfolio.</p>
+    </div>
+
+    <div class="stat-row two">
+      <div class="stat"><div class="stat-label" id="cagr-label">CAGR</div><div class="stat-value num" id="stat-cagr">—</div><div class="stat-sub">average annual dividend growth</div></div>
+      <div class="stat"><div class="stat-label" id="ytd-label">Year to date</div><div class="stat-value num" id="stat-ytd">—</div><div class="stat-sub" id="stat-ytd-sub">—</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Total dividends received, by year</div>
+      <div class="card-note">in home currency (SGD) · hatched bar = year in progress</div>
+      <div class="years" id="chart-growth"></div>
+    </div>
+  </section>
+
+  <!-- 06 YIELD -->
+  <section class="block" id="yield">
+    <div class="sec-head">
+        <h2>Yield on Cost &amp; Current Yield</h2>
+        <p>Trailing-12-month, per-unit-normalised: each payment is divided by the units held on that exact payout date, so a lot bought or sold mid-year no longer distorts the rate. The trailing window itself adapts to each holding's own payout frequency, rather than a fixed day count, so a quarterly, semi-annual or annual payer is never cut off mid-cycle. Yield on cost applies that trailing rate to today's average cost; current yield applies it to today's price.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Portfolio yield on cost (TTM)</div><div class="stat-value num" id="stat-yoc">—</div></div>
+      <div class="stat"><div class="stat-label">Portfolio current yield (TTM)</div><div class="stat-value num" id="stat-cur-yield">—</div></div>
+      <div class="stat"><div class="stat-label">Spread</div><div class="stat-value num" id="stat-spread">—</div><div class="stat-sub" id="stat-spread-sub">—</div></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-title">Yield on cost vs. current yield — top holdings</div>
+      <div class="dumb-legend">
+        <span><i style="background:var(--ink-3);"></i>Yield on cost</span>
+        <span><i style="background:var(--div);"></i>Current yield</span>
+      </div>
+      <div class="dumblist" id="chart-yield"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <p><strong>Sourced from your workbook.</strong> Holdings, capital gain/loss and unrealised P&amp;L come from the Portfolio Overview and Unrealised P&amp;L Dashboard tabs. Realised P&amp;L is the full total across closed positions in the Realised P&amp;L Dashboard. Dividend growth is the year-by-year history from the Dividend Dashboard. Yield on cost and current yield come from the workbook's yield calculation. This is a snapshot as of the date above — re-run it whenever you want an updated view.</p>
+</footer>
+
+<div id="tip"></div>
+
+<script src="app.js"></script>
 </body>
 </html>
