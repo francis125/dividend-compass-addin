@@ -91,6 +91,12 @@ a{ color:inherit; }
 .sample-badge.live{ background:var(--gain-soft); color:var(--gain); border-color:color-mix(in srgb, var(--gain) 35%, transparent); }
 .sample-badge.live::before{ background:var(--gain); }
 .updated{ font-size:12px; color:var(--ink-3); white-space:nowrap; }
+.currency-badge{
+  display:inline-flex; align-items:center;
+  font-size:12px; font-weight:600; letter-spacing:.02em;
+  color:var(--ink-2); background:var(--surface-2); border:1px solid var(--border);
+  padding:5px 10px; border-radius:999px; white-space:nowrap;
+}
 
 .subnav{ display:flex; gap:6px; overflow-x:auto; padding-bottom:12px; scrollbar-width:none; }
 .subnav::-webkit-scrollbar{ display:none; }
