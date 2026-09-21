@@ -48,7 +48,8 @@
     unrealised:        "Unrealized P&L Dashboard",
     realised:           "Realised P&L Dashboard",
     dividends:          "Dividend Dashboard",
-    yocCalc:            "YoC Calc (Do Not Edit)"
+    yocCalc:            "YoC Calc (Do Not Edit)",
+    dividendLedger:      "Dividend Ledger"
   };
 
   var RANGES = {
@@ -77,6 +78,17 @@
     //   G DivsRcvdLC | H DivsRcvdSGD | I ClosedP/LLC | J ClosedP/LSGD | K TotalReturnSGD | L Return%
     rHoldings:   { sheet: "realised", addr: "B6:L106" },
     rTotal:      { sheet: "realised", addr: "J137" }, // grand-total closed P/L SGD
+
+    // Dividend Ledger — per-payment rows (row 4-738), used to attribute
+    // dividends to CLOSED lots per company, the same way Unrealized P&L
+    // Dashboard's own "Divs Rcvd" column sources its per-company total from
+    // this same ledger's "Div Attributable (SGD)" column, matched by
+    // Company Name (col B). Column W here is "Div Attributable Closed
+    // Lots (SGD)" — the ledger already splits each payout between the
+    // units still held at that date and the units since sold, so this is
+    // the exact per-holding dividend figure for the Realised P&L section.
+    //   B Company Name | ... (cols C-V unused here) ... | W Div Attributable Closed Lots (SGD)
+    divLedger:   { sheet: "dividendLedger", addr: "B4:W738" },
 
     // Dividend Dashboard — year-by-year (row 7-26, 2007-2026)
     //   B Year | K Total Div SGD
@@ -245,17 +257,33 @@
       .map(function (row) { return { name: regionName(str(row[0])), code: str(row[0]), value: num(row[1]) }; });
     if (cashOnSide) geoMix.push({ name: "Cash", code: "Multi-ccy", value: cashOnSide });
 
+    // ---- Dividend Ledger: dividends attributable to CLOSED lots, per company
+    // Realised P&L Dashboard's own G/H "Divs Rcvd" columns are never
+    // populated in the workbook — but the ledger already computes this per
+    // payment (col W = "Div Attributable Closed Lots (SGD)"), so sum it by
+    // company name, the same SUMIFS pattern the workbook itself uses to
+    // populate Unrealized P&L Dashboard's dividend column from this sheet.
+    var divLedgerByCompany = {};
+    rows(r, "divLedger").forEach(function (row) {
+      var name = str(row[0]);
+      if (!name) return;
+      // addr starts at col B, so col offset 0=B(name) ... 21=W(Div Attributable Closed Lots SGD)
+      divLedgerByCompany[name] = (divLedgerByCompany[name] || 0) + num(row[21]);
+    });
+
     // ---- Realised P&L Dashboard: closed positions ------------------------
     var rRows = rows(r, "rHoldings")
       .filter(function (row) { return str(row[0]); })
       .map(function (row) {
-        return { name: str(row[0]), date: "Closed position", cap: num(row[8]), div: 0, total: num(row[8]) };
+        var name = str(row[0]);
+        var cap = num(row[8]);
+        var div = divLedgerByCompany[name] || 0;
+        return { name: name, date: "Closed position", cap: cap, div: div, total: cap + div };
       });
     var realisedCap = num((rows(r, "rTotal")[0] || [])[0]) || rRows.reduce(function (a, x) { return a + x.cap; }, 0);
 
     // ---- Dividend Dashboard: year-by-year, also gives lifetime total -----
     var divYearRows = rows(r, "divYears").filter(function (row) { return str(row[0]) && row[9] !== null && row[9] !== ""; });
-    var lifetimeDiv = divYearRows.reduce(function (a, row) { return a + num(row[9]); }, 0);
     var nowYear = new Date().getFullYear();
     var years = divYearRows.slice(-6).map(function (row) {
       return { y: str(row[0]), v: num(row[9]) };
@@ -265,9 +293,10 @@
       if (parseInt(years[i].y, 10) === nowYear) { years[i].ytd = true; years[i].g = null; }
     }
 
-    // Realised dividends collected = lifetime dividends minus dividends
-    // already attributed to still-open positions (Unrealized P&L Dashboard total).
-    var realisedDiv = Math.max(0, lifetimeDiv - totalDivRcvd);
+    // Realised dividends collected = sum of each closed position's own
+    // "Div Attributable Closed Lots" figure from the Dividend Ledger (see
+    // divLedgerByCompany above) — precise per-holding, not an estimate.
+    var realisedDiv = rRows.reduce(function (a, x) { return a + x.div; }, 0);
     var realisedTotal = realisedCap + realisedDiv;
 
     // ---- Stats: largest holding, top-5 concentration, up/down counts -----
