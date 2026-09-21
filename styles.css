@@ -271,3 +271,33 @@ footer strong{ color:var(--ink-2); }
   .dumblist .row{ grid-template-columns:104px 1fr 104px; gap:8px; }
   .brand-text p{ display:none; }
 }
+
+/* ---------- responsive tables (stacked cards, no horizontal scroll) ---------- */
+@media (max-width:640px){
+  .tbl-wrap{ overflow-x:visible; border-top:none; margin-top:10px; }
+  table{ min-width:0; width:100%; display:block; }
+  table thead{ display:none; }
+  table tbody{ display:block; }
+  table tbody tr{
+    display:block; border:1px solid var(--border); border-radius:12px;
+    padding:4px 12px; margin-bottom:10px; background:var(--surface);
+  }
+  table tbody tr.total{ border-width:2px; border-color:var(--ink-3); }
+  table tbody td{
+    display:flex; justify-content:space-between; align-items:center; gap:14px;
+    padding:8px 0; border-bottom:1px solid var(--border);
+    text-align:right; white-space:normal; word-break:break-word;
+  }
+  table tbody td:empty{ display:none; }
+  table tbody td:last-child{ border-bottom:none; }
+  table tbody td::before{
+    content:attr(data-label); font-size:11px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.03em; color:var(--ink-3); text-align:left; flex:none;
+  }
+  table tbody td:first-child{
+    display:block; text-align:left; font-weight:700; font-size:13.5px;
+    padding:10px 0 8px;
+  }
+  table tbody td:first-child::before{ content:none; }
+  .tkr{ font-size:11px; }
+}
