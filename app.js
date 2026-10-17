@@ -1,6 +1,3 @@
-
-
-App · JS
 /* Dividend Compass — Office Add-in dashboard logic
    -------------------------------------------------------------------------
    Rendering (charts, tables, KPIs) is a faithful port of the approved
@@ -851,5 +848,3 @@ App · JS
     });
   }
 })();
- 
-Claude finished the response
