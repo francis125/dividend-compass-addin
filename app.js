@@ -4,7 +4,7 @@
    design template. Data can come from two places:
  
      1. LIVE  — read directly out of the workbook's own source-of-truth
-        sheets via Office.js (SHEETS/RANGES config below), not from any
+        sheets via Office.js (RANGES config below: named ranges), not from any
         pre-computed dashboard tab:
           - Portfolio Overview        — holdings, weightings, asset mix,
                                          geographic mix, cash, portfolio/
@@ -69,6 +69,10 @@
    "Divs Rcvd (SGD)" column (S$556,945, which the Main Dashboard uses). A new
    Expenses tab reads the Expense Dashboard through names starting EXP_.
    Names and what they hold: FrancisAcc_named_ranges_v4_80.md.
+   v14: the year in progress comes from the workbook's year switch (DC_Year = Portfolio
+   Overview D1) so the Dividends page follows it; the Expenses tab already follows it because
+   the Expense Dashboard is driven by D1; a #REF! on the Expense Dashboard (SG tab missing) is
+   reported in plain words.
  
    If columns are added or removed INSIDE a named block, update the index
    numbers in mapLiveRangesToData(); inserting or deleting whole rows or
@@ -113,7 +117,8 @@
     rHoldings:   { name: "DC_Real_Holdings" },
     rTotal:      { name: "DC_Real_Total" },
     divYears:    { name: "DC_Div_Years" },
-    yocHoldings: { name: "DC_YoC_Holdings" }
+    yocHoldings: { name: "DC_YoC_Holdings" },
+    year:        { name: "DC_Year", optional: true }   // the year in Portfolio Overview D1 (the workbook's year switch)
   };
  
   // ===========================================================================
@@ -196,7 +201,7 @@
         var missing = [], wrong = [], out = {};
         keys.forEach(function (key) {
           var cfg = spec[key], rng = loaded[key];
-          if (rng.isNullObject) { missing.push(cfg.name); return; }
+          if (rng.isNullObject) { if (!cfg.optional) missing.push(cfg.name); return; }
           var vals = rng.values || [];
           if (cfg.header) {
             var found = str(vals[0] && vals[0][0]);
@@ -251,7 +256,7 @@
     uRows.forEach(function (row) {
       uByName[str(row[0])] = { cost: num(row[5]), mv: num(row[7]), gl: num(row[8]), glp: num(row[9]) * 100, div: num(row[11]) };
     });
-    // uTotals spans the full contiguous range G160:R160 (12 columns: G..R),
+    // DC_Unreal_Totals is the TOTAL row of the Unrealized P&L Dashboard, columns G..R (12 columns),
     // so every column in between is present in the row array even though we
     // only care about a few of them — index by real column offset from G.
     var uTotalsRow = rows(r, "uTotals")[0] || [];
@@ -298,7 +303,7 @@
     var totalCapGl = uTotalPL, totalDivRcvd = uTotalDiv;
  
     // ---- Portfolio Overview summary block (Equity / Cash / Grand Total) --
-    // Range starts at row50 itself (the Equity row), not the header above it.
+    // DC_PO_Summary starts with its header row (checked, then dropped on load).
     // The block is read by LABEL (Equity / Cash / Grand Total), not by row position.
     var poSummaryRows = rows(r, "poSummary");
     function byLabel(list, label) {
@@ -348,7 +353,9 @@
  
     // ---- Dividend Dashboard: year-by-year, also gives lifetime total -----
     var divYearRows = rows(r, "divYears").filter(function (row) { return str(row[0]) && row[9] !== null && row[9] !== ""; });
-    var nowYear = new Date().getFullYear();
+    // The "year in progress" follows the workbook's year switch (Portfolio Overview D1, name DC_Year);
+    // if that name is absent (older workbook) it falls back to the calendar year.
+    var nowYear = num(((r.year && r.year.values && r.year.values[0]) || [])[0]) || new Date().getFullYear();
     var years = divYearRows.slice(-6).map(function (row) {
       return { y: str(row[0]), v: num(row[9]) };
     });
@@ -949,8 +956,25 @@
     }).then(function () { expBusy = false; });
   }
 
+  function findSheetError(x) {
+    var keys = Object.keys(x);
+    for (var k = 0; k < keys.length; k++) {
+      var v = x[keys[k]].values || [];
+      for (var i = 0; i < v.length; i++) {
+        for (var j = 0; j < v[i].length; j++) {
+          if (typeof v[i][j] === "string" && /^#(REF|NAME|VALUE|DIV\/0|N\/A|NUM|NULL|CALC|SPILL)/.test(v[i][j])) return v[i][j] + " in " + EXP_RANGES[keys[k]].name;
+        }
+      }
+    }
+    return "";
+  }
+
   function renderExpenses(x) {
     if (!tip) tip = document.getElementById("tip");
+    var sheetErr = findSheetError(x);
+    if (sheetErr) {
+      throw new Error("The Expense Dashboard is showing " + sheetErr + ". If you just changed the year in Portfolio Overview D1, check that the SG tab for that year exists.");
+    }
     var warns = [];
 
     // ---- settings --------------------------------------------------------
@@ -1063,6 +1087,7 @@
           '<td class="wrap" data-label="Share">' + fracPct(num(t[2])) + "% of year-to-date spend</td></tr>";
         continue;
       }
+      if (!str(t[0]) && typeof t[1] !== "number") continue;   // no entry yet (for example early in a new year)
       var mm = /^(\d+)\.\s*(.*)$/.exec(str(t[0]));
       rows += "<tr><td>" + esc(mm ? mm[1] : "") + "</td>" +
         '<td data-label="Category">' + esc(mm ? mm[2] : t[0]) + "</td>" +
