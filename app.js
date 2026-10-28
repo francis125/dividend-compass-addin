@@ -54,10 +54,27 @@
         or a live read fails. The status badge in the header reflects
         which one is on screen.
  
-   If you rename a sheet, or reorder/insert columns in one of the ranges
-   below, update SHEETS/RANGES to match — everything else keeps working
-   unchanged since rendering is driven entirely off the data shape, not
-   cell addresses.
+   v12 (29-Oct-2026): every range is now read through a NAMED RANGE defined in
+   the workbook (FrancisAcc v4.80 or later: Formulas > Name Manager, names
+   starting DC_), so inserting rows no longer breaks this file. Each name is
+   checked on load (the blocks that carry a header row must start with their
+   expected header) and a cross-check compares the holdings total with the
+   Equity total, the asset mix with the Grand Total and the geographic mix
+   with Equity; any problem is shown in the yellow note under the title
+   instead of being silently wrong. Fixed in the same pass (all were wrong
+   against the v4.80 layout): "cash on the side" showed the Equity value,
+   Asset Mix listed a "Type" header row and left out Cash, Geographic Mix
+   listed a "Region" header row, and Realised dividends were summed from the
+   Dividend Ledger (S$489,491) instead of the Realised P&L Dashboard's own
+   "Divs Rcvd (SGD)" column (S$556,945, which the Main Dashboard uses). A new
+   Expenses tab reads the Expense Dashboard through names starting EXP_.
+   Names and what they hold: FrancisAcc_named_ranges_v4_80.md.
+ 
+   If columns are added or removed INSIDE a named block, update the index
+   numbers in mapLiveRangesToData(); inserting or deleting whole rows or
+   columns around the blocks needs no change here (the names move with them).
+   If a name is deleted or renamed in the workbook, this page says so under
+   the title and shows sample data instead.
    ------------------------------------------------------------------------- */
  
 (function () {
@@ -68,74 +85,35 @@
   // ===========================================================================
   var USE_LIVE_DATA = true;
  
-  var SHEETS = {
-    portfolioOverview: "Portfolio Overview",
-    unrealised:        "Unrealized P&L Dashboard",
-    realised:           "Realised P&L Dashboard",
-    dividends:          "Dividend Dashboard",
-    yocCalc:            "YoC Calc (Do Not Edit)",
-    dividendLedger:      "Dividend Ledger"
-  };
- 
+  // Named ranges in the workbook (Formulas > Name Manager). Excel moves a name
+  // with its cells when rows/columns are inserted. `header` = the block's first
+  // row is a header row: it must start with this text; `dropHeader` removes it.
+  //   poHoldings   B Ticker | C Company | D Last price | E Units | F Avg cost | G Mkt value SGD |
+  //                H Country | I Type | J Manual yield (data rows only; blank slots are skipped)
+  //   poSummary    header, Equity, Cash, blank, Grand Total: H label | I Value SGD | J Weight | K Div % | L Div SGD | M Monthly
+  //   poAssetMix   header + one row per type: K Type | L Allocation % | M Allocation SGD
+  //   poGeoMix     header + one row per region (equity only): D Region | E Value SGD | ...
+  //   uHoldings    B Company | C Brokerage | D Units | E AvgCostLC | F TotalCostLC | G TotalCostSGD |
+  //                H UnitCostLC | I MktValueSGD | J P/L SGD | K Return % | L DivsRcvdLC | M DivsRcvdSGD
+  //   uTotals      G TotalCostSGD ... I MktValueSGD | J P/L | K Return % | M DivsRcvdSGD | Q TotalReturnSGD | R TotalReturn %
+  //   rHoldings    B Company | C Txns | D UnitsSold | E TotalCostSGD | F ExitCostSGD | G DivsRcvdLC |
+  //                H DivsRcvdSGD | I ClosedP/LLC | J ClosedP/LSGD | K TotalReturnSGD | L Return %
+  //   rTotal       grand-total closed P/L SGD
+  //   divYears     B Year | ... | K Total Div SGD (2007-2054)
+  //   yocHoldings  B Ticker | C Company | D Price LC | E Avg Cost LC | F Mkt Value SGD |
+  //                G TTM Per-Unit Div LC | H # Payments TTM | I Yield on Cost TTM | J Current Yield TTM
+  // (The Dividend Ledger is no longer read: DC_Div_Ledger still exists in the workbook but is unused.)
   var RANGES = {
-    // Portfolio Overview — current holdings (row 5-42 capacity, 26 used)
-    //   B Ticker | C Company | D Last price | E Units | F Avg cost | G Mkt value SGD |
-    //   H Country | I Type | J Manual Current Yield TYPED | K Weightage | ...
-    // NOTE: col J is no longer Weightage (moved to K) as of FrancisAcc v4.x —
-    // harmless here since the "weight" field this reads is not used
-    // downstream, but don't start relying on it without fixing the index too.
-    poHoldings:  { sheet: "portfolioOverview", addr: "B5:J42" },
-    // Portfolio Segment summary — row60 Equity, row61 Cash, row62 blank, row63 Grand Total
-    //   H label | I Value SGD | J Weightage % | K Div % | L Div SGD | M Monthly
-    poSummary:   { sheet: "portfolioOverview", addr: "H60:M63" },
-    // Asset mix — K:Type, L:Allocation %, M:Allocation SGD (rows 67-70)
-    poAssetMix:  { sheet: "portfolioOverview", addr: "K67:M70" },
-    // Geographic mix (equity only) — D:Region, E:Value SGD (rows 67-74)
-    poGeoMix:    { sheet: "portfolioOverview", addr: "D67:J74" },
- 
-    // Unrealized P&L Dashboard — per-holding, dynamic spill from B5 (row 5-43, 39 slots)
-    //   B Company | C Brokerage | D Units | E AvgCostLC | F TotalCostLC | G TotalCostSGD |
-    //   H UnitCostLC | I MktValueSGD | J P/L SGD | K Return % | L DivsRcvdLC | M DivsRcvdSGD
-    uHoldings:   { sheet: "unrealised", addr: "B5:M43" },
-    // Grand-total row (row 44 — sheet was trimmed, total used to sit at row 160):
-    //   G TotalCostSGD | I MktValueSGD | J P/L SGD | K Return % |
-    //   M DivsRcvdSGD | Q TotalReturnSGD | R TotalReturn %
-    uTotals:     { sheet: "unrealised", addr: "G44:R44" },
- 
-    // Realised P&L Dashboard — per-company closed positions (row 4-134, 131 slots)
-    //   B Company | C Txns | D UnitsSold | E TotalCostSGD | F ExitCostSGD |
-    //   G DivsRcvdLC | H DivsRcvdSGD | I ClosedP/LLC | J ClosedP/LSGD | K TotalReturnSGD | L Return%
-    rHoldings:   { sheet: "realised", addr: "B4:L134" },
-    rTotal:      { sheet: "realised", addr: "J135" }, // grand-total closed P/L SGD
- 
-    // Dividend Ledger — per-payment rows (table runs well past row 738, the
-    // old end of this range — extended to row 1677 which covers it with
-    // room to grow), used to attribute dividends to CLOSED lots per company,
-    // the same way Unrealized P&L Dashboard's own "Divs Rcvd" column sources
-    // its per-company total from this same ledger's "Div Attributable (SGD)"
-    // column, matched by Company Name (col B). Column X (NOT W — W is "Div
-    // Attributable (LC)", local currency; X is the SGD-converted figure this
-    // needs) — the ledger already splits each payout between the units
-    // still held at that date and the units since sold, so this is the
-    // exact per-holding dividend figure for the Realised P&L section.
-    //   B Company Name | ... (cols C-W unused here) ... | X Div Attributable (SGD)
-    divLedger:   { sheet: "dividendLedger", addr: "B4:X1677" },
- 
-    // Dividend Dashboard — year-by-year, data starts row 4 (2007), capacity to row 52
-    //   B Year | K Total Div SGD
-    divYears:    { sheet: "dividends", addr: "B4:K52" },
- 
-    // YoC Calc (Do Not Edit) — per-holding TTM yields (row 4-29, same 26 holdings/order as Portfolio Overview)
-    //   B Ticker | C Company | D Price LC | E Avg Cost LC | F Mkt Value SGD |
-    //   G TTM Per-Unit Div LC | H # Payments TTM | I Yield on Cost TTM | J Current Yield TTM
-    // Portfolio-level totals are NOT read from a precomputed cell block: the
-    // "PORTFOLIO TOTALS (TTM)" labels Francis added (now around row 73-78)
-    // were never wired to actual formulas — every cell under them is blank,
-    // which is why the portfolio Yield on Cost / Current Yield tiles always
-    // showed 0.00% regardless of which address was configured here. Instead
-    // they're computed below directly from these same per-holding columns
-    // (D, E, F, J), which is robust to this sheet being restructured again.
-    yocHoldings: { sheet: "yocCalc", addr: "B4:J29" }
+    poHoldings:  { name: "DC_PO_Holdings" },
+    poSummary:   { name: "DC_PO_Summary",  header: "Portfolio Segment", dropHeader: true },
+    poAssetMix:  { name: "DC_PO_AssetMix", header: "Type", dropHeader: true },
+    poGeoMix:    { name: "DC_PO_GeoMix",   header: "Region", dropHeader: true },
+    uHoldings:   { name: "DC_Unreal_Holdings" },
+    uTotals:     { name: "DC_Unreal_Totals" },
+    rHoldings:   { name: "DC_Real_Holdings" },
+    rTotal:      { name: "DC_Real_Total" },
+    divYears:    { name: "DC_Div_Years" },
+    yocHoldings: { name: "DC_YoC_Holdings" }
   };
  
   // ===========================================================================
@@ -175,11 +153,13 @@
     loadLiveData()
       .then(function (data) {
         setStatus(true);
+        showNote(data.notes && data.notes.length ? data.notes.join(" ") : "", false);
         renderAll(data);
       })
       .catch(function (err) {
         console.error("Dividend Compass: live read failed, falling back to sample data.", err);
         setStatus(false);
+        showNote("Could not read your workbook, so this page is showing SAMPLE data. " + (err && err.message ? err.message : err), true);
         renderAll(SAMPLE);
       });
   }
@@ -200,24 +180,49 @@
   // ===========================================================================
   // 4. LIVE DATA — Office.js reads straight from the source sheets
   // ===========================================================================
-  function loadLiveData() {
+  // Read a set of named ranges in ONE Excel call and check them. `spec` maps a
+  // key to { name, header? }. Resolves to { key: { values } }; rejects with one
+  // plain-English message if any name is missing or no longer starts with its
+  // expected header.
+  function readNamedRanges(spec) {
     return Excel.run(function (context) {
-      var sheetCache = {};
-      function getSheet(key) {
-        if (!sheetCache[key]) sheetCache[key] = context.workbook.worksheets.getItem(SHEETS[key]);
-        return sheetCache[key];
-      }
-      var loaded = {};
-      Object.keys(RANGES).forEach(function (key) {
-        var cfg = RANGES[key];
-        var rng = getSheet(cfg.sheet).getRange(cfg.addr);
-        rng.load("values");
+      var keys = Object.keys(spec), loaded = {};
+      keys.forEach(function (key) {
+        var rng = context.workbook.names.getItemOrNullObject(spec[key].name).getRangeOrNullObject();
+        rng.load("values,isNullObject");
         loaded[key] = rng;
       });
       return context.sync().then(function () {
-        return mapLiveRangesToData(loaded);
+        var missing = [], wrong = [], out = {};
+        keys.forEach(function (key) {
+          var cfg = spec[key], rng = loaded[key];
+          if (rng.isNullObject) { missing.push(cfg.name); return; }
+          var vals = rng.values || [];
+          if (cfg.header) {
+            var found = str(vals[0] && vals[0][0]);
+            var want = cfg.header.toLowerCase(), got = found.toLowerCase();
+            var okHeader = cfg.prefix ? got.indexOf(want) === 0 : got === want;
+            if (!okHeader) {
+              wrong.push(cfg.name + ' starts with "' + found + '" (expected "' + cfg.header + '")');
+              return;
+            }
+            if (cfg.dropHeader) vals = vals.slice(1);
+          }
+          out[key] = { values: vals };
+        });
+        if (missing.length || wrong.length) {
+          var parts = [];
+          if (missing.length) parts.push("Missing named range: " + missing.join(", ") + " (use FrancisAcc v4.80 or later).");
+          if (wrong.length) parts.push("Named range moved: " + wrong.join("; ") + " (check Formulas > Name Manager).");
+          throw new Error(parts.join(" "));
+        }
+        return out;
       });
     });
+  }
+
+  function loadLiveData() {
+    return readNamedRanges(RANGES).then(function (out) { return mapLiveRangesToData(out); });
   }
  
   function num(x) { return typeof x === "number" ? x : 0; }
@@ -294,10 +299,20 @@
  
     // ---- Portfolio Overview summary block (Equity / Cash / Grand Total) --
     // Range starts at row50 itself (the Equity row), not the header above it.
-    var poSummaryRows = rows(r, "poSummary"); // row0=Equity(50), row1=Cash(51), row2=blank(52), row3=GrandTotal(53)
-    var equityRow = poSummaryRows[0] || [], cashRow = poSummaryRows[1] || [];
-    var portfolioValue = num(equityRow[1]) || totalMv; // G=0(label) H=1(Value SGD)
+    // The block is read by LABEL (Equity / Cash / Grand Total), not by row position.
+    var poSummaryRows = rows(r, "poSummary");
+    function byLabel(list, label) {
+      for (var i = 0; i < list.length; i++) { if (str(list[i][0]).toLowerCase().indexOf(label) === 0) return list[i]; }
+      return [];
+    }
+    var equityRow = byLabel(poSummaryRows, "equity"), cashRow = byLabel(poSummaryRows, "cash"), grandRow = byLabel(poSummaryRows, "grand");
+    var portfolioValue = num(equityRow[1]) || totalMv; // H=0(label) I=1(Value SGD)
     var cashOnSide = num(cashRow[1]);
+    var grandTotal = num(grandRow[1]);
+    var notes = [];
+    if (num(equityRow[1]) && totalMv && Math.abs(num(equityRow[1]) - totalMv) / num(equityRow[1]) > 0.005) {
+      notes.push("Check: the holdings add up to $" + fmt(totalMv) + " but Portfolio Overview's Equity total is $" + fmt(num(equityRow[1])) + ".");
+    }
  
     // ---- Asset mix / Geographic mix --------------------------------------
     var catColors = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--ink-3)"];
@@ -309,29 +324,24 @@
       .map(function (row) { return { name: regionName(str(row[0])), code: str(row[0]), value: num(row[1]) }; });
     // Cash is intentionally excluded from Geographic mix — that chart is
     // equity exposure by region only.
- 
-    // ---- Dividend Ledger: dividends attributable to CLOSED lots, per company
-    // Realised P&L Dashboard's own G/H "Divs Rcvd" columns are never
-    // populated in the workbook — but the ledger already computes this per
-    // payment (col X = "Div Attributable (SGD)" — NOT col W, which is the
-    // same figure in local currency), so sum it by company name, the same
-    // SUMIFS pattern the workbook itself uses to populate Unrealized P&L
-    // Dashboard's dividend column from this sheet.
-    var divLedgerByCompany = {};
-    rows(r, "divLedger").forEach(function (row) {
-      var name = str(row[0]);
-      if (!name) return;
-      // addr starts at col B, so col offset 0=B(name) ... 22=X(Div Attributable SGD)
-      divLedgerByCompany[name] = (divLedgerByCompany[name] || 0) + num(row[22]);
-    });
+    var assetMixSum = assetMix.reduce(function (a, d) { return a + d.value; }, 0);
+    if (grandTotal && Math.abs(assetMixSum - grandTotal) / grandTotal > 0.005) {
+      notes.push("Check: the asset mix adds up to $" + fmt(assetMixSum) + " but the Grand Total is $" + fmt(grandTotal) + ".");
+    }
+    var geoMixSum = geoMix.reduce(function (a, d) { return a + d.value; }, 0);
+    if (num(equityRow[1]) && Math.abs(geoMixSum - num(equityRow[1])) / num(equityRow[1]) > 0.005) {
+      notes.push("Check: the geographic mix adds up to $" + fmt(geoMixSum) + " but the Equity total is $" + fmt(num(equityRow[1])) + ".");
+    }
  
     // ---- Realised P&L Dashboard: closed positions ------------------------
+    // Capital G/L = J (Closed P/L SGD); dividends = H (Divs Rcvd SGD), the
+    // column the workbook now fills and the Main Dashboard sums (so the two agree).
     var rRows = rows(r, "rHoldings")
       .filter(function (row) { return str(row[0]); })
       .map(function (row) {
         var name = str(row[0]);
         var cap = num(row[8]);
-        var div = divLedgerByCompany[name] || 0;
+        var div = num(row[6]);
         return { name: name, date: "Closed position", cap: cap, div: div, total: cap + div };
       });
     var realisedCap = num((rows(r, "rTotal")[0] || [])[0]) || rRows.reduce(function (a, x) { return a + x.cap; }, 0);
@@ -348,8 +358,7 @@
     }
  
     // Realised dividends collected = sum of each closed position's own
-    // "Div Attributable Closed Lots" figure from the Dividend Ledger (see
-    // divLedgerByCompany above) — precise per-holding, not an estimate.
+    // "Divs Rcvd (SGD)" figure on the Realised P&L Dashboard.
     var realisedDiv = rRows.reduce(function (a, x) { return a + x.div; }, 0);
     var realisedTotal = realisedCap + realisedDiv;
  
@@ -413,6 +422,7 @@
       .sort(function (a, b) { return b.yoc - a.yoc; }).slice(0, 9);
     data.yields.push({ name: "Portfolio overall", yoc: portfolioYoc, cur: portfolioCurYield, hl: true });
  
+    data.notes = notes;
     return data;
   }
  
@@ -847,4 +857,252 @@
       el.appendChild(row);
     });
   }
+
+  // ===========================================================================
+  // 7. NOTE BANNER, TABS AND THE EXPENSES PAGE
+  // ===========================================================================
+  function showNote(text, isError) {
+    var el = document.getElementById("load-note");
+    if (!el) return;
+    if (!text) { el.hidden = true; el.textContent = ""; return; }
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+    el.hidden = false;
+  }
+
+  // Expense Dashboard blocks (names defined in the workbook, FrancisAcc v4.80+).
+  //   settings   label/value pairs: Year, As of, Year elapsed, Month in progress, Days left
+  //   tiles      row 0 = labels, row 1 = values (five tiles, each two merged columns)
+  //   categories header + six categories + Total: Category | Monthly target | Annual target | YTD used |
+  //              % used | Target at pace | Over/(under) | Over/(under) % | Projected | Status
+  //   safe       header + six + Total (row-aligned with categories): Left to spend | Allowed per day | Typical day | Verdict
+  //   months     header, 'Monthly target' row, Jan-Dec, YTD total: Month | six categories | Total | Monthly target | Over/(under)
+  //   watch      header + ten supplier slots + total: Supplier | Entries | Total | % of Wine/Dine
+  //   run        header + six + Total: Category | Projected full year | vs annual target | Allowed a month
+  //   transport  seven label/value rows (Transport, cash only)
+  //   top        header + ten + total: Category | Amount | Date | Description
+  //   check      reconciliation check, must be 0
+  var EXP_RANGES = {
+    settings:  { name: "EXP_Settings",       header: "Year" },
+    tiles:     { name: "EXP_Tiles",          header: "YTD SPENT", prefix: true },
+    categories:{ name: "EXP_Categories",     header: "Category" },
+    safe:      { name: "EXP_SafeDaily",      header: "Left to spend", prefix: true },
+    months:    { name: "EXP_Months",         header: "Month" },
+    watch:     { name: "EXP_Watchlist",      header: "Supplier", prefix: true },
+    run:       { name: "EXP_RunRate",        header: "Category" },
+    transport: { name: "EXP_TransportCash",  header: "Monthly target", prefix: true },
+    top:       { name: "EXP_Top10",          header: "Category" },
+    check:     { name: "EXP_Check" }
+  };
+
+  function esc(x) {
+    return String(x === null || x === undefined ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function money(n) { return (n < 0 ? "\u2212$" : "$") + fmt(n); }
+  function fracPct(n) { return pct2((n || 0) * 100); }
+  function signedFracPct(n) { return signedPct2((n || 0) * 100); }
+  function serialToDate(n) {
+    if (typeof n !== "number") return "";
+    var d = new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 86400000);
+    return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  }
+  function chipClass(label) {
+    var t = str(label).toLowerCase();
+    if (t.indexOf("over") === 0 || t.indexOf("out of reach") === 0 || t.indexOf("target passed") === 0) return "chip bad";
+    if (t.indexOf("under") === 0 || t.indexOf("room") === 0) return "chip good";
+    return "chip mid";
+  }
+  function chip(label) { return label ? '<span class="' + chipClass(label) + '">' + esc(label) + "</span>" : ""; }
+  function statHtml(label, value, sub, cls) {
+    return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value num' + (cls ? " " + cls : "") + '">' + value + "</div>" +
+      (sub ? '<div class="stat-sub">' + sub + "</div>" : "") + "</div>";
+  }
+  function setHtml(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+
+  var expBusy = false;
+  function loadAndRenderExpenses() {
+    var body = document.getElementById("exp-body");
+    var err = document.getElementById("exp-error");
+    function fail(msg) {
+      if (err) { err.textContent = msg; err.hidden = false; }
+      if (body) body.hidden = true;
+      setText("exp-updated", "");
+    }
+    if (typeof Excel === "undefined" || typeof Office === "undefined") {
+      fail("Expenses are read from your open workbook. Open this page from the Dividend Compass pane in Excel.");
+      return;
+    }
+    if (expBusy) return;
+    expBusy = true;
+    setText("exp-updated", "Reading\u2026");
+    readNamedRanges(EXP_RANGES).then(function (x) {
+      if (err) err.hidden = true;
+      if (body) body.hidden = false;
+      renderExpenses(x);
+      setText("exp-updated", "Pulled " + new Date().toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" }) +
+        ", " + new Date().toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" }));
+      forceReflow();
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(forceReflow);
+    }).catch(function (e) {
+      console.error("Dividend Compass: expense read failed.", e);
+      fail("Could not read the Expense Dashboard. " + (e && e.message ? e.message : e));
+    }).then(function () { expBusy = false; });
+  }
+
+  function renderExpenses(x) {
+    if (!tip) tip = document.getElementById("tip");
+    var warns = [];
+
+    // ---- settings --------------------------------------------------------
+    var st = {}, sv = x.settings.values[0] || [];
+    for (var i = 0; i + 1 < sv.length; i += 2) st[str(sv[i])] = sv[i + 1];
+    setText("exp-asof", "SG " + str(st["Year"]) + " \u00b7 as of " + serialToDate(st["As of"]) + " \u00b7 " + fracPct(st["Year elapsed"]) + "% of the year gone \u00b7 " + str(st["Days left"]) + " days left");
+
+    // ---- reconciliation check -------------------------------------------
+    var chk = (x.check.values[0] || [])[0];
+    if (typeof chk !== "number" || Math.abs(chk) > 0.5) {
+      warns.push("Check: YTD spend on the Expense Dashboard does not tie to the SG tab" + (typeof chk === "number" ? " (difference $" + fmt(chk) + ")" : "") + ".");
+    }
+
+    // ---- tiles -----------------------------------------------------------
+    var tv = x.tiles.values[1] || [];
+    var overRow = x.categories.values[7] || [];
+    var over = num(tv[4]);
+    setHtml("exp-tiles",
+      statHtml("Spent this year", money(num(tv[0])), "year to date") +
+      statHtml("Target at this point", money(num(tv[2])), "annual target \u00d7 share of the year gone") +
+      statHtml("Over / (under) target", signedSgd(over), chip(overRow[9]), over > 0 ? "down" : "up") +
+      statHtml("Full-year target", money(num(tv[6])), "from the Monthly Expense tab") +
+      statHtml("Projected full year", money(num(tv[8])), "straight line at the year-to-date rate") +
+      statHtml("Days left", String(num(st["Days left"])), "in the year"));
+
+    // ---- categories (+ safe daily spend) ---------------------------------
+    var cat = x.categories.values, safe = x.safe.values;
+    if (cat.length !== safe.length) warns.push("Check: the safe-daily block has " + safe.length + " rows but the category block has " + cat.length + ".");
+    var rows = "";
+    for (var r = 1; r < cat.length; r++) {
+      var c = cat[r], sd = safe[r] || [];
+      var isTotal = r === cat.length - 1;
+      var pctCls = str(c[9]).toLowerCase().indexOf("over") === 0 ? "down" : (str(c[9]).toLowerCase().indexOf("under") === 0 ? "up" : "");
+      rows += '<tr' + (isTotal ? ' class="total"' : "") + "><td>" + esc(c[0]) + "</td>" +
+        '<td class="num" data-label="Spent">' + money(num(c[3])) + "</td>" +
+        '<td class="num" data-label="Target so far">' + money(num(c[5])) + "</td>" +
+        '<td class="num ' + pctCls + '" data-label="vs target">' + signedFracPct(num(c[7])) + "%</td>" +
+        '<td data-label="Status">' + chip(c[9]) + "</td>" +
+        '<td class="num" data-label="Allowed a day">' + money(num(sd[1])) + "</td>" +
+        '<td class="num ' + (str(sd[3]).toLowerCase().indexOf("out") === 0 ? "down" : "") + '" data-label="Typical day">' + money(num(sd[2])) + "</td></tr>";
+    }
+    setHtml("table-exp-cat", "<thead><tr><th>Category</th><th>Spent</th><th>Target so far</th><th>vs target</th><th>Status</th><th>Allowed a day</th><th>Typical day</th></tr></thead><tbody>" + rows + "</tbody>");
+
+    // ---- run-rate --------------------------------------------------------
+    var run = x.run.values; rows = "";
+    for (r = 1; r < run.length; r++) {
+      var q = run[r], isT = r === run.length - 1;
+      if (cat[r] && str(cat[r][0]) !== str(q[0])) warns.push("Check: run-rate row " + r + " is \"" + str(q[0]) + "\" but the category block has \"" + str(cat[r][0]) + "\".");
+      rows += '<tr' + (isT ? ' class="total"' : "") + "><td>" + esc(q[0]) + "</td>" +
+        '<td class="num" data-label="Projected full year">' + money(num(q[1])) + "</td>" +
+        '<td class="num ' + (num(q[2]) > 0 ? "down" : "up") + '" data-label="vs annual target">' + signedSgd(num(q[2])) + "</td>" +
+        '<td class="num" data-label="Allowed a month">' + money(num(q[3])) + "</td></tr>";
+    }
+    setHtml("table-exp-run", "<thead><tr><th>Category</th><th>Projected full year</th><th>vs annual target</th><th>Allowed a month</th></tr></thead><tbody>" + rows + "</tbody>");
+
+    // ---- transport, cash only --------------------------------------------
+    var tr = x.transport.values, kv = "";
+    for (r = 0; r < tr.length; r++) {
+      var lab = str(tr[r][0]), v = tr[r][1], txt;
+      if (typeof v === "number") {
+        txt = lab.toLowerCase().indexOf("vs pace") === 0 ? signedFracPct(v) + "%" : (lab.toLowerCase().indexOf("over") === 0 ? signedSgd(v) : money(v));
+      } else { txt = chip(v) || esc(v); }
+      kv += "<li><span>" + esc(lab) + '</span><b class="num">' + txt + "</b></li>";
+    }
+    setHtml("list-exp-transport", kv);
+
+    // ---- month by month ---------------------------------------------------
+    var mrows = x.months.values.slice(2, 14).filter(function (row) { return typeof row[7] === "number"; });
+    var maxM = 0;
+    mrows.forEach(function (row) { maxM = Math.max(maxM, num(row[7]), num(row[8])); });
+    maxM = maxM * 1.05 || 1;
+    var mel = document.getElementById("chart-exp-months");
+    if (mel) {
+      clear(mel);
+      mrows.forEach(function (row) {
+        var tot = num(row[7]), tgt = num(row[8]), isOver = tot > tgt;
+        var el = document.createElement("div");
+        el.className = "row";
+        el.innerHTML = '<div class="name">' + esc(row[0]) + "</div>" +
+          '<div class="track"><div class="fill num' + (isOver ? " over" : "") + '" style="width:' + (tot / maxM * 100) + '%"></div>' +
+          '<div class="tgt" style="left:' + (tgt / maxM * 100) + '%"></div></div>' +
+          '<div class="val num ' + (isOver ? "down" : "") + '">' + money(tot) + "</div>";
+        var f = el.querySelector(".fill");
+        f.addEventListener("mousemove", function (e) { moveTip(e); showTip(e, "<b>" + esc(row[0]) + "</b>" + money(tot) + " spent &middot; target " + money(tgt) + " &middot; " + signedSgd(tot - tgt)); });
+        f.addEventListener("mouseleave", hideTip);
+        mel.appendChild(el);
+      });
+    }
+    var ytdRow = x.months.values[14] || [];
+    setText("exp-months-note", "Bars show total spend each month; the dark tick is the monthly target; red bars are above it. Year to date: " + money(num(ytdRow[7])) + ".");
+
+    // ---- merchant watchlist ----------------------------------------------
+    var wl = x.watch.values; rows = "";
+    for (r = 1; r < wl.length; r++) {
+      var w = wl[r], isWt = r === wl.length - 1;
+      if (!isWt && !str(w[0])) continue;
+      rows += '<tr' + (isWt ? ' class="total"' : "") + "><td>" + esc(w[0]) + "</td>" +
+        '<td class="num" data-label="Entries">' + fmt(num(w[1])) + "</td>" +
+        '<td class="num" data-label="Total">' + money(num(w[2])) + "</td>" +
+        '<td class="num" data-label="Share of Wine/Dine">' + fracPct(num(w[3])) + "%</td></tr>";
+    }
+    setHtml("table-exp-watch", "<thead><tr><th>Supplier</th><th>Entries</th><th>Total</th><th>Share of Wine/Dine</th></tr></thead><tbody>" + rows + "</tbody>");
+
+    // ---- top 10 -----------------------------------------------------------
+    var tp = x.top.values; rows = "";
+    for (r = 1; r < tp.length; r++) {
+      var t = tp[r], isTp = r === tp.length - 1;
+      if (isTp) {
+        rows += '<tr class="total"><td></td><td>' + esc(t[0]) + '</td><td class="num" data-label="Amount">' + money(num(t[1])) + '</td><td></td>' +
+          '<td class="wrap" data-label="Share">' + fracPct(num(t[2])) + "% of year-to-date spend</td></tr>";
+        continue;
+      }
+      var mm = /^(\d+)\.\s*(.*)$/.exec(str(t[0]));
+      rows += "<tr><td>" + esc(mm ? mm[1] : "") + "</td>" +
+        '<td data-label="Category">' + esc(mm ? mm[2] : t[0]) + "</td>" +
+        '<td class="num" data-label="Amount">' + money(num(t[1])) + "</td>" +
+        '<td data-label="Date">' + esc(t[2]) + "</td>" +
+        '<td class="wrap" data-label="Description">' + esc(t[3]) + "</td></tr>";
+    }
+    setHtml("table-exp-top", "<thead><tr><th>#</th><th>Category</th><th>Amount</th><th>Date</th><th>Description</th></tr></thead><tbody>" + rows + "</tbody>");
+
+    var wEl = document.getElementById("exp-warn");
+    if (wEl) { wEl.textContent = warns.join(" "); wEl.hidden = !warns.length; }
+  }
+
+  // ---- tabs ------------------------------------------------------------
+  function setHidden(id, hide) { var el = document.getElementById(id); if (el) el.hidden = !!hide; }
+  function showPage(page) {
+    var isExp = page === "expenses";
+    setHidden("page-dividends", isExp);
+    setHidden("page-expenses", !isExp);
+    setHidden("subnav-dividends", isExp);
+    setHidden("subnav-expenses", !isExp);
+    var btns = document.querySelectorAll(".tabs button");
+    for (var i = 0; i < btns.length; i++) {
+      var on = btns[i].getAttribute("data-page") === page;
+      btns[i].classList.toggle("on", on);
+      btns[i].setAttribute("aria-selected", on ? "true" : "false");
+    }
+    if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
+    if (isExp) loadAndRenderExpenses();
+    forceReflow();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(forceReflow);
+  }
+  function setupTabs() {
+    var btns = document.querySelectorAll(".tabs button");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function () { showPage(this.getAttribute("data-page")); });
+    }
+    var rf = document.getElementById("exp-refresh");
+    if (rf) rf.addEventListener("click", loadAndRenderExpenses);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupTabs);
+  else setupTabs();
 })();
