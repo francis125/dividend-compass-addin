@@ -1,4 +1,4 @@
-/* Dividend Compass — Office Add-in dashboard logic
+/* Wealth Compass (formerly Dividend Compass) — Office Add-in dashboard logic
    -------------------------------------------------------------------------
    Rendering (charts, tables, KPIs) is a faithful port of the approved
    design template. Data can come from two places:
@@ -157,7 +157,7 @@
         renderAll(data);
       })
       .catch(function (err) {
-        console.error("Dividend Compass: live read failed, falling back to sample data.", err);
+        console.error("Wealth Compass: live read failed, falling back to sample data.", err);
         setStatus(false);
         showNote("Could not read your workbook, so this page is showing SAMPLE data. " + (err && err.message ? err.message : err), true);
         renderAll(SAMPLE);
@@ -929,7 +929,7 @@
       setText("exp-updated", "");
     }
     if (typeof Excel === "undefined" || typeof Office === "undefined") {
-      fail("Expenses are read from your open workbook. Open this page from the Dividend Compass pane in Excel.");
+      fail("Expenses are read from your open workbook. Open this page from the Wealth Compass pane in Excel.");
       return;
     }
     if (expBusy) return;
@@ -944,7 +944,7 @@
       forceReflow();
       if (typeof requestAnimationFrame === "function") requestAnimationFrame(forceReflow);
     }).catch(function (e) {
-      console.error("Dividend Compass: expense read failed.", e);
+      console.error("Wealth Compass: expense read failed.", e);
       fail("Could not read the Expense Dashboard. " + (e && e.message ? e.message : e));
     }).then(function () { expBusy = false; });
   }
