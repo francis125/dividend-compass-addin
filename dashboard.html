@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
 
@@ -30,7 +30,11 @@
       <span class="updated" id="updated-label"></span>
     </div>
   </div>
-  <div class="subnav">
+  <div class="tabs" role="tablist" aria-label="Pages">
+    <button type="button" role="tab" class="on" data-page="dividends" aria-selected="true">Dividends</button>
+    <button type="button" role="tab" data-page="expenses" aria-selected="false">Expenses</button>
+  </div>
+  <div class="subnav" id="subnav-dividends">
     <a href="#holdings">Holdings</a>
     <a href="#capital">Capital gain/loss</a>
     <a href="#unrealised">Unrealised P&amp;L</a>
@@ -38,7 +42,18 @@
     <a href="#growth">Dividend growth</a>
     <a href="#yield">Yield</a>
   </div>
+  <div class="subnav" id="subnav-expenses" hidden>
+    <a href="#exp-spend">Spending</a>
+    <a href="#exp-categories">Categories</a>
+    <a href="#exp-months">Months</a>
+    <a href="#exp-watchlist">Merchant watchlist</a>
+    <a href="#exp-top10">Top 10</a>
+  </div>
 </div>
+
+<div class="wrap"><div id="load-note" class="load-note" hidden></div></div>
+
+<div id="page-dividends">
 
 <main class="wrap">
 
@@ -221,9 +236,97 @@
 <footer class="wrap">
   <p><strong>Sourced from your workbook.</strong> Holdings, capital gain/loss and unrealised P&amp;L come from the Portfolio Overview and Unrealised P&amp;L Dashboard tabs. Realised P&amp;L is the full total across closed positions in the Realised P&amp;L Dashboard. Dividend growth is the year-by-year history from the Dividend Dashboard. Yield on cost and current yield come from the workbook's yield calculation. This is a snapshot as of the date above — re-run it whenever you want an updated view.</p>
 </footer>
+</div><!-- /page-dividends -->
+
+<div id="page-expenses" hidden>
+<main class="wrap">
+
+  <div class="exp-head">
+    <div>
+      <h2 class="exp-title">Expenses</h2>
+      <p class="exp-asof" id="exp-asof">—</p>
+    </div>
+    <div class="exp-actions">
+      <span class="updated" id="exp-updated"></span>
+      <button type="button" class="btn" id="exp-refresh">Refresh</button>
+    </div>
+  </div>
+  <div id="exp-error" class="load-note error" hidden></div>
+  <div id="exp-warn" class="load-note" hidden></div>
+
+  <div id="exp-body">
+
+    <section class="block" id="exp-spend">
+      <div class="sec-head">
+        <h2>Spending vs target</h2>
+        <p>What you have spent so far this year against the target for this point in the year, and where the year is heading.</p>
+      </div>
+      <div class="stat-row" id="exp-tiles"></div>
+    </section>
+
+    <section class="block" id="exp-categories">
+      <div class="sec-head">
+        <h2>By category</h2>
+        <p>“vs target” compares spending so far with the target for this point in the year. “Allowed a day” is what is left of the annual target divided by the days left; “Typical day” is spending so far divided by the days gone.</p>
+      </div>
+      <div class="card card-pad">
+        <div class="tbl-wrap"><table id="table-exp-cat" class="t-num2"></table></div>
+      </div>
+      <div class="grid-2" style="margin-top:14px;">
+        <div class="card card-pad">
+          <div class="card-title">Where the year is heading</div>
+          <div class="card-note">projected at the average of the last three full months, against the annual target</div>
+          <div class="tbl-wrap"><table id="table-exp-run" class="t-num2"></table></div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">Transport, cash only</div>
+          <div class="card-note">the Transport target without car depreciation, which is never paid out</div>
+          <ul class="kv" id="list-exp-transport"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="exp-months">
+      <div class="sec-head">
+        <h2>Month by month</h2>
+        <p>Total spending each month against the monthly target.</p>
+      </div>
+      <div class="card card-pad">
+        <div class="card-note" id="exp-months-note"></div>
+        <div class="mlist" id="chart-exp-months"></div>
+      </div>
+    </section>
+
+    <section class="block" id="exp-watchlist">
+      <div class="sec-head">
+        <h2>Merchant watchlist</h2>
+        <p>Entries in the Wine/Dine/Shop descriptions that belong to each supplier you track.</p>
+      </div>
+      <div class="card card-pad">
+        <div class="tbl-wrap"><table id="table-exp-watch" class="t-num2"></table></div>
+      </div>
+    </section>
+
+    <section class="block" id="exp-top10">
+      <div class="sec-head">
+        <h2>Top 10 spends of the year</h2>
+        <p>The ten largest single rows of the year across all categories. A Wine/Dine row is a whole day, so one row can hold several purchases.</p>
+      </div>
+      <div class="card card-pad">
+        <div class="tbl-wrap"><table id="table-exp-top"></table></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="wrap">
+  <p><strong>Read live from your workbook.</strong> Everything on this page comes from the Expense Dashboard tab through named ranges starting EXP_ (Formulas &gt; Name Manager); targets come from the Monthly Expense tab. Press Refresh after changing the workbook.</p>
+</footer>
+</div><!-- /page-expenses -->
 
 <div id="tip"></div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
